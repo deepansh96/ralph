@@ -1,0 +1,23 @@
+# Runtime artifacts (generated during ralph execution)
+archive/
+runs/
+progress.txt
+prd.json
+/prd-*.md
+/*-plan.md
+*-plan-docs/
+*-review.txt
+.last-branch
+ralph-run.log
+ralph_runs_cumulative.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

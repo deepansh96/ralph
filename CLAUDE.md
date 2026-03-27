@@ -13,10 +13,9 @@ ralph/
 ├── ralph.sh              # Main loop script (~330 lines bash)
 ├── cleanup.sh            # Archive completed runs
 ├── prompts/
-│   └── agent.md          # Default agent prompt (project-agnostic)
-├── skills/
-│   ├── prd-creator.md    # Claude Code skill: generate PRDs
-│   └── prd-to-json.md    # Claude Code skill: convert PRDs to prd.json
+│   ├── agent.md          # Default agent prompt (project-agnostic)
+│   ├── prd-creator.md    # Instructions for creating a PRD
+│   └── prd-to-json.md    # Instructions for converting PRD to prd.json
 ├── test_prompt.md        # Test/debug prompt
 ├── CLAUDE.md             # This file
 ├── README.md             # User documentation

@@ -53,33 +53,22 @@ git clone https://github.com/deepansh96/ralph.git ralph
 chmod +x ralph/ralph.sh ralph/cleanup.sh
 ```
 
-### Install Skills (optional)
-
-Ralph includes two Claude Code skills for PRD creation. To make them available in your project:
-
-```bash
-# Symlink skills to your project's .claude/commands/
-mkdir -p .claude/commands
-ln -s ../../ralph/skills/prd-creator.md .claude/commands/prd-creator.md
-ln -s ../../ralph/skills/prd-to-json.md .claude/commands/prd-to-json.md
-```
-
-Or they may be auto-discovered by Claude Code from the `ralph/skills/` directory.
-
 ## Usage
 
 ### 1. Create a PRD
 
-Write a PRD or use the included skill:
+Tag the prompt file and ask Claude to create a PRD for your feature:
 
 ```
-/prd-creator    # Interactive PRD generation with clarifying questions
+@ralph/prompts/prd-creator.md create a prd for [describe your feature]
 ```
 
 ### 2. Convert to prd.json
 
+Tag the converter prompt and point it at your PRD:
+
 ```
-/prd-to-json    # Converts PRD markdown to ralph/prd.json
+@ralph/prompts/prd-to-json.md convert this prd
 ```
 
 Or create `ralph/prd.json` manually:
@@ -183,10 +172,10 @@ The default `prompts/agent.md` works for most projects out of the box.
 ralph/
 ├── ralph.sh              # Main loop script
 ├── cleanup.sh            # Archive completed runs
-├── prompts/agent.md      # Default agent prompt
-├── skills/               # Claude Code skills
-│   ├── prd-creator.md
-│   └── prd-to-json.md
+├── prompts/
+│   ├── agent.md          # Default agent prompt
+│   ├── prd-creator.md    # PRD creation instructions (tag with @)
+│   └── prd-to-json.md    # PRD-to-JSON conversion instructions (tag with @)
 ├── test_prompt.md        # Test prompt
 ├── CLAUDE.md             # Dev reference
 └── README.md             # This file

@@ -7,11 +7,43 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 ## The Job
 
 1. Receive a feature description from the user
-2. Ask 3-5 essential clarifying questions (with lettered options)
-3. Generate a structured PRD based on answers
-4. Save to `ralph/workspaces/[feature-name]/prd-[feature-name].md` (create the workspace folder if it doesn't exist)
+2. **Discover the project's testing setup** (see below)
+3. Ask 3-5 essential clarifying questions (with lettered options)
+4. Generate a structured PRD based on answers
+5. Save to `ralph/workspaces/[feature-name]/prd-[feature-name].md` (create the workspace folder if it doesn't exist)
 
 **Important:** Do NOT start implementing. Just create the PRD.
+
+---
+
+## Step 0: Discover Testing Setup
+
+Before asking clarifying questions, explore the project to understand what testing infrastructure exists. This determines what test criteria go into each user story.
+
+**What to look for:**
+
+1. **Unit tests** — Search for test directories and config files:
+   - `tests/`, `test/`, `__tests__/`, `spec/`, `**/test_*.py`, `**/*.test.ts`, `**/*.spec.ts`
+   - Config: `pytest.ini`, `pyproject.toml [tool.pytest]`, `jest.config.*`, `vitest.config.*`, `karma.conf.*`
+   - Run command: check `package.json` scripts, `Makefile`, `CLAUDE.md`
+
+2. **Integration tests** — Look for:
+   - Separate test directories like `tests/integration/`, `tests/api/`
+   - Database fixtures, test containers, or test DB setup scripts
+   - API test files (e.g., `test_api_*.py`, `*.integration.test.ts`)
+
+3. **E2E tests** — Look for:
+   - Playwright: `playwright.config.*`, `e2e/`, `**/*.spec.ts` (in e2e dir)
+   - Cypress: `cypress.config.*`, `cypress/`
+   - Custom runners: `run_tests.sh`, `test-e2e` scripts
+
+4. **Build/lint checks** — Look for:
+   - `npm run build`, `npm run lint`, `tsc --noEmit`
+   - Pre-existing lint errors (note count if many — don't block on pre-existing ones)
+
+5. **CLAUDE.md** — Read it if it exists. It often documents exact test commands and known issues.
+
+**Record what you find.** Include it in the PRD's Technical Considerations section and use the exact commands in acceptance criteria. If a testing layer doesn't exist, don't invent criteria for it — only reference what the project actually has.
 
 ---
 
@@ -76,16 +108,19 @@ Each story should be small enough to implement in one focused session.
 **Acceptance Criteria:**
 - [ ] Specific verifiable criterion
 - [ ] Another criterion
-- [ ] **[Backend]** Unit tests added and passing (see CLAUDE.md for test command)
-- [ ] **[Frontend]** Build passes (see CLAUDE.md for build command)
+- [ ] **[Backend]** Unit tests added and passing (`<exact command from Step 0>`)
+- [ ] **[Frontend]** Build passes (`<exact command from Step 0>`)
 - [ ] **[UI stories only]** Verify in browser using agent-browser. (See agent-browser --help)
 ```
 
 **Important:**
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
+- **Use the exact test commands you discovered in Step 0.** Do not write generic "tests pass" — write the actual command (e.g., `cd server && python -m pytest tests/ -v`, `npm run build`, `./run_tests.sh notifications.spec.js`).
+- **Only include test criteria for test types that exist.** If the project has no E2E tests, don't add E2E criteria. If there are no frontend unit tests, don't add them. Match what the project actually has.
 - **For any story with UI changes:** Always include "Verify in browser using agent-browser" as acceptance criteria. This ensures visual verification of frontend work.
-- **Testing is required:** Backend stories should include unit tests. Frontend stories should pass build/lint/tests. Reference project-specific test patterns in CLAUDE.md for exact commands.
-- **Always add a final review story:** Every PRD must end with a review story that explores the codebase, reviews all changes made, and documents findings in `ralph/[feature]-review.txt`. This ensures quality control and provides a summary of what was accomplished. Any issues faced, something that got stuck, some decision that was taken against the plan, document all these here as well.
+- **If the project has E2E tests:** Add E2E criteria to UI stories with the exact runner command and relevant spec file.
+- **Note pre-existing issues:** If lint has 300+ pre-existing errors, note that in the criteria so Ralph doesn't block on them (e.g., "Lint passes — fix errors you introduced; N pre-existing errors exist").
+- **Always add a final review story:** Every PRD must end with a review story that explores the codebase, reviews all changes made, and documents findings in the workspace's review file. This ensures quality control and a summary of what was accomplished.
 
 ### 4. Functional Requirements
 Numbered list of specific functionalities:
@@ -240,6 +275,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 
 Before saving the PRD:
 
+- [ ] **Explored project testing setup** (unit, integration, E2E, build, lint)
 - [ ] Asked clarifying questions with lettered options
 - [ ] Incorporated user's answers
 - [ ] User stories are small and specific

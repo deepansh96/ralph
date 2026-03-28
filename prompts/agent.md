@@ -12,12 +12,11 @@ You are an autonomous coding agent working on a software project.
 6. Pick the **highest priority** user story where `passes: false`
 7. Implement that single user story
 8. Run quality checks (see **Quality Checks** below)
-9. Create or update AGENTS.md files for folders you modified (see below)
-10. Update `CLAUDE.md` (at project root) if you discover project-wide patterns (see below)
-11. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-12. Update the PRD to set `passes: true` for the completed story
-13. Append your progress to `ralph/progress.txt`
-14. **STOP** - Do not start another story. End your response here. (See Stop Condition below)
+9. Update `CLAUDE.md` (at project root) if you discover project-wide patterns (see below)
+10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+11. Update the PRD to set `passes: true` for the completed story
+12. Append your progress to `ralph/progress.txt`
+13. **STOP** - Do not start another story. End your response here. (See Stop Condition below)
 
 {{CONTEXT_SECTION}}
 
@@ -66,86 +65,9 @@ If you discover a **reusable pattern** that future iterations should know, add i
 
 Only add patterns that are **general and reusable**, not story-specific details. Keep them concise.
 
-## Create and Update AGENTS.md Files
-
-AGENTS.md files provide folder-specific context for AI agents and developers. **If a folder you modified does NOT have an AGENTS.md, CREATE ONE.**
-
-### When to Create AGENTS.md
-
-Create an AGENTS.md in a folder when:
-- You modified files in a folder that lacks one
-- The folder contains important business logic, components, or utilities
-- The folder has non-obvious patterns that future work needs to understand
-
-### AGENTS.md Template
-
-```markdown
-# [Folder Name]
-
-## Purpose
-[1-2 sentences: What this folder contains and why it exists]
-
-## Structure
-\`\`\`
-folder/
-├── index.ts          # Public exports
-├── types.ts          # Shared types
-├── [subfolder]/      # [Brief description]
-└── ...
-\`\`\`
-
-## Key Files
-| File | Purpose |
-|------|---------|
-| `filename.ts` | [What it does, when to modify it] |
-
-## Conventions
-
-### Naming
-- Components: PascalCase (e.g., `UserCard.tsx`)
-- Utilities: camelCase (e.g., `formatDate.ts`)
-- Types: PascalCase with suffix (e.g., `UserProps`, `ApiResponse`)
-
-### Patterns
-[Code example showing the pattern to follow]
-\`\`\`typescript
-// Do this
-export function doSomething() { ... }
-
-// Not this
-function doSomething() { ... }
-\`\`\`
-
-## Do NOT
-- [Specific anti-pattern to avoid]
-- [Another thing that breaks stuff]
-
-## Gotchas
-- **[Issue]**: [What happens] -> [How to fix]
-- **[Another issue]**: [Explanation]
-
-## Dependencies
-- Depends on: `../other-folder` for [reason]
-- Used by: `../consumer` for [reason]
-```
-
-### Updating Existing AGENTS.md
-
-When an AGENTS.md already exists:
-1. Read it first to understand existing patterns
-2. Add new learnings to the appropriate section
-3. Update outdated information if you find it incorrect
-4. Keep entries concise - link to code rather than duplicating it
-
-**Do NOT add to AGENTS.md:**
-- Story-specific implementation details
-- Temporary debugging notes
-- Information that belongs in code comments
-- Duplicate information from progress.txt
-
 ## Update CLAUDE.md (Project-Wide Patterns)
 
-`CLAUDE.md` at the project root stores **project-wide** patterns, commands, and conventions. This is where Claude Code looks for project context. Unlike AGENTS.md (folder-specific), CLAUDE.md applies to the entire project.
+`CLAUDE.md` at the project root stores **project-wide** patterns, commands, and conventions. This is where Claude Code looks for project context.
 
 ### When to Update CLAUDE.md
 
@@ -249,5 +171,3 @@ If there are still stories with `passes: false`:
 - Keep CI green
 - Read `CLAUDE.md` (project root) and Codebase Patterns section in progress.txt before starting
 - Update `CLAUDE.md` with project-wide learnings (commands, versions, gotchas)
-- **Create** AGENTS.md in folders you modify if they don't have one
-- Update existing AGENTS.md with folder-specific learnings

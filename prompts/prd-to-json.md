@@ -6,7 +6,7 @@ Converts existing PRDs to the prd.json format that Ralph uses for autonomous exe
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to `prd.json` and keep it in `ralph/prd.json`
+Take a PRD (markdown file or text) and convert it to `prd.json` and keep it in the same workspace folder as the PRD (e.g., `ralph/workspaces/[feature-name]/prd.json`)
 
 ---
 

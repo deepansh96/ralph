@@ -27,29 +27,29 @@ ralph/
 | Mechanism | How It Works |
 |-----------|-------------|
 | **Iteration loop** | `ralph.sh` runs `claude -p <prompt> --output-format json` up to N times |
+| **Per-PRD workspaces** | `--prd <name>` creates isolated folder at `workspaces/<name>/` |
 | **Context injection** | `--context` flag lists file paths in the prompt via `{{CONTEXT_SECTION}}` |
+| **Prompt placeholders** | `{{WORKSPACE}}` and `{{CONTEXT_SECTION}}` are substituted at runtime |
 | **One story per iteration** | Prompt enforces picking ONE story, implementing it, then stopping |
 | **Completion signal** | Agent emits `<promise>COMPLETE</promise>` when all stories pass |
 | **Branch tracking** | `.last-branch` file detects branch changes and auto-archives |
 | **Metrics** | Per-iteration JSON files with duration, tokens, cost |
 | **Cumulative stats** | `ralph_runs_cumulative.json` aggregates across runs |
-| **Archival** | `cleanup.sh` moves completed work to `archive/{date}-{feature}/` |
-| **Pattern persistence** | `progress.txt` Codebase Patterns section survives cleanup |
+| **Archival** | `cleanup.sh <name>` moves workspace to `archive/{date}-{name}/` |
 
 ## Commands
 
 ```bash
 # Run ralph (from the project root, not ralph/)
-./ralph/ralph.sh 15                                        # 15 iterations, default prompt
-./ralph/ralph.sh 15 --context docs/architecture.md         # With context file
-./ralph/ralph.sh 15 --context docs/ --context CLAUDE.md    # Multiple context sources
-./ralph/ralph.sh 10 ./my-custom-prompt.md --context src/   # Custom prompt + context
+./ralph/ralph.sh --prd my-feature 15                                # 15 iterations
+./ralph/ralph.sh --prd my-feature 15 --context docs/architecture.md # With context
+./ralph/ralph.sh --prd my-feature 15 --context docs/ --context CLAUDE.md
 
 # Archive completed feature
-./ralph/cleanup.sh
+./ralph/cleanup.sh my-feature
 
 # Test the setup
-./ralph/ralph.sh 1 ./ralph/test_prompt.md
+./ralph/ralph.sh --prd test 1 ./ralph/test_prompt.md
 ```
 
 ## Editing Prompts
@@ -61,9 +61,5 @@ ralph/
 ## Runtime Files (gitignored)
 
 These are created during execution and ignored by git:
-- `prd.json` — current feature PRD
-- `prd-*.md` — PRD markdown files
-- `progress.txt` — iteration progress log
-- `runs/` — per-iteration metrics
+- `workspaces/<name>/` — per-feature workspace (prd.json, progress.txt, runs/, etc.)
 - `archive/` — completed feature archives
-- `.last-branch` — branch tracking

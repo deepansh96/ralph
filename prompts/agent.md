@@ -5,8 +5,8 @@ You are an autonomous coding agent working on a software project.
 ## Your Task
 
 1. Read context files listed below (if any) for project architecture and feature plans
-2. Read the PRD at `ralph/prd.json`
-3. Read the progress log at `ralph/progress.txt` (check Codebase Patterns section first)
+2. Read the PRD at `{{WORKSPACE}}/prd.json`
+3. Read the progress log at `{{WORKSPACE}}/progress.txt` (check Codebase Patterns section first)
 4. Read `CLAUDE.md` at the project root (project-wide patterns, commands, and quality checks)
 5. Check you're on the correct branch from PRD `branchName`. If not, check it out from the current branch.
 6. Pick the **highest priority** user story where `passes: false`
@@ -15,14 +15,14 @@ You are an autonomous coding agent working on a software project.
 9. Update `CLAUDE.md` (at project root) if you discover project-wide patterns (see below)
 10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
 11. Update the PRD to set `passes: true` for the completed story
-12. Append your progress to `ralph/progress.txt`
+12. Append your progress to `{{WORKSPACE}}/progress.txt`
 13. **STOP** - Do not start another story. End your response here. (See Stop Condition below)
 
 {{CONTEXT_SECTION}}
 
 ## Progress Report Format
 
-APPEND to ralph/progress.txt (never replace, always append):
+APPEND to {{WORKSPACE}}/progress.txt (never replace, always append):
 ```
 ## [Date/Time] - [Story ID]
 Session: <session-id>
@@ -149,7 +149,7 @@ Run the relevant E2E spec for UI stories. Check CLAUDE.md or the project structu
 **After completing ONE user story, you MUST STOP IMMEDIATELY.**
 
 1. Update the PRD to set `passes: true` for the completed story
-2. Append your progress to `ralph/progress.txt`
+2. Append your progress to `{{WORKSPACE}}/progress.txt`
 3. Check if ALL stories now have `passes: true`
 
 If ALL stories are complete and passing, reply with:

@@ -71,45 +71,23 @@ Tag the converter prompt and point it at your PRD:
 @ralph/prompts/prd-to-json.md convert this prd
 ```
 
-Or create `ralph/prd.json` manually:
-
-```json
-{
-  "project": "MyApp",
-  "branchName": "ralph/my-feature",
-  "description": "Feature description",
-  "userStories": [
-    {
-      "id": "US-001",
-      "title": "Add database schema",
-      "description": "As a developer, I need the schema for this feature.",
-      "acceptanceCriteria": [
-        "Migration runs successfully",
-        "Unit tests pass"
-      ],
-      "priority": 1,
-      "passes": false,
-      "notes": ""
-    }
-  ]
-}
-```
+Both steps create a workspace folder at `ralph/workspaces/[feature-name]/` containing the PRD files.
 
 ### 3. Run Ralph
 
 ```bash
 # From your project root
-./ralph/ralph.sh [max_iterations] [prompt_file] [--context <path>...]
+./ralph/ralph.sh --prd <name> [max_iterations] [prompt_file] [--context <path>...]
 
 # Examples
-./ralph/ralph.sh                                          # 10 iterations, default prompt
-./ralph/ralph.sh 15                                       # 15 iterations
-./ralph/ralph.sh 15 --context docs/architecture.md        # With context file
-./ralph/ralph.sh 15 --context docs/ --context CLAUDE.md   # Multiple context sources
-./ralph/ralph.sh 10 ./my-prompt.md --context src/types/   # Custom prompt + context dir
+./ralph/ralph.sh --prd my-feature                                       # 10 iterations, default prompt
+./ralph/ralph.sh --prd my-feature 15                                    # 15 iterations
+./ralph/ralph.sh --prd my-feature 15 --context docs/architecture.md     # With context file
+./ralph/ralph.sh --prd my-feature 15 --context docs/ --context CLAUDE.md  # Multiple context sources
 ```
 
-The `--context` flag is repeatable. Files are listed in the prompt for the agent to read at the start of each iteration. Directories are recursively expanded to include all files within.
+- `--prd` is required — identifies the workspace at `ralph/workspaces/<name>/`
+- `--context` is repeatable — files are listed in the prompt for the agent to read at the start of each iteration. Directories are recursively expanded.
 
 ### 4. Monitor Progress
 
@@ -137,10 +115,10 @@ Ralph prints a diagnostics table after each iteration:
 After a feature is done:
 
 ```bash
-./ralph/cleanup.sh
+./ralph/cleanup.sh my-feature
 ```
 
-This moves all runtime files to `ralph/archive/{date}-{feature}/` and creates a fresh `progress.txt` with preserved codebase patterns.
+This moves the entire workspace `ralph/workspaces/my-feature/` to `ralph/archive/{date}-my-feature/`.
 
 ## Customization
 
@@ -164,7 +142,7 @@ The agent prompt (`prompts/agent.md`) tells Claude to follow whatever quality ch
 For project-specific agent behavior, create your own prompt and pass it as an argument:
 
 ```bash
-./ralph/ralph.sh 10 ./my-ralph-prompt.md
+./ralph/ralph.sh --prd my-feature 10 ./my-ralph-prompt.md
 ```
 
 The default `prompts/agent.md` works for most projects out of the box.
@@ -188,30 +166,28 @@ ralph/
 **Created during execution (gitignored):**
 ```
 ralph/
-├── prd.json              # Current feature PRD
-├── prd-*.md              # PRD markdown files
-├── progress.txt          # Iteration progress log
-├── .last-branch          # Branch tracking
-├── runs/                 # Per-iteration metrics
-│   └── {timestamp}/
-│       ├── iteration_001.json
-│       ├── iteration_002.json
-│       └── summary.json
-├── ralph_runs_cumulative.json  # Cross-run totals
-└── archive/              # Completed features
-    └── {date}-{feature}/
-        ├── prd.json
-        ├── progress.txt
-        └── runs/
+├── workspaces/                    # Active feature workspaces
+│   └── my-feature/                # One folder per PRD
+│       ├── prd.json               # Feature PRD
+│       ├── prd-my-feature.md      # PRD markdown
+│       ├── progress.txt           # Iteration progress log
+│       ├── runs/                  # Per-iteration metrics
+│       │   └── {timestamp}/
+│       │       ├── iteration_001.json
+│       │       └── summary.json
+│       └── ralph_runs_cumulative.json
+└── archive/                       # Completed features
+    └── {date}-my-feature/         # Archived workspace
+        └── (same contents)
 ```
 
 ## Key Design Decisions
 
 - **One story per iteration**: Prevents context overflow. Each iteration starts fresh with no memory of previous work.
-- **Progress persistence**: `progress.txt` carries learnings between iterations. Codebase Patterns section survives cleanup.
+- **Per-PRD workspaces**: Each feature gets its own folder at `ralph/workspaces/<name>/`. All state (prd.json, progress.txt, metrics) is isolated. Archive moves the whole folder.
+- **Progress persistence**: `progress.txt` carries learnings between iterations within a workspace.
 - **Quality gates from CLAUDE.md**: The agent prompt is project-agnostic. Project-specific quality checks live in the host project's `CLAUDE.md`.
 - **Context via `--context` flag**: Pass architecture docs, feature plans, or entire directories as context. Paths are listed in the prompt; the agent reads them at runtime. Like pral's `--context` flag.
-- **Branch tracking**: Auto-archives when PRD branch changes, preventing stale state.
 - **Metrics tracking**: Every iteration records duration, token usage, and cost as JSON for analysis.
 
 ## Companion Tool: PRAL

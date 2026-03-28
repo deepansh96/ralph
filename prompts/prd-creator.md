@@ -9,7 +9,7 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 1. Receive a feature description from the user
 2. Ask 3-5 essential clarifying questions (with lettered options)
 3. Generate a structured PRD based on answers
-4. Save to `ralph/prd-[feature-name].md`
+4. Save to `ralph/workspaces/[feature-name]/prd-[feature-name].md` (create the workspace folder if it doesn't exist)
 
 **Important:** Do NOT start implementing. Just create the PRD.
 
@@ -132,7 +132,7 @@ The PRD reader may be a junior developer or AI agent. Therefore:
 ## Output
 
 - **Format:** Markdown (`.md`)
-- **Location:** `ralph/`
+- **Location:** `ralph/workspaces/[feature-name]/`
 - **Filename:** `prd-[feature-name].md` (kebab-case)
 
 ---
@@ -199,7 +199,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - [ ] Use explore agents to understand the current state of modified files
 - [ ] Review git diff to see all changes made
 - [ ] Verify no unintended side effects or missing pieces
-- [ ] Create `ralph/[feature]-review.txt` with concise findings (under 50 lines)
+- [ ] Create `ralph/workspaces/[feature-name]/[feature]-review.txt` with concise findings (under 50 lines)
 - [ ] Review file summarizes: what was done, files changed, any concerns or recommendations
 
 ## Functional Requirements
@@ -246,7 +246,7 @@ Before saving the PRD:
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
 - [ ] **Final story is a review step** (explores codebase, reviews changes, writes findings to .txt file)
-- [ ] Saved to `ralph/prd-[feature-name].md`
+- [ ] Saved to `ralph/workspaces/[feature-name]/prd-[feature-name].md`
 
 ---
 

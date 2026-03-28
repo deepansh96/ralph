@@ -1,10 +1,14 @@
 #!/bin/bash
 # Ralph - Autonomous AI agent loop for feature implementation
-# Usage: ./ralph.sh [options] [max_iterations] [prompt_file]
+# Usage: ./ralph.sh --prd <name> [options] [max_iterations] [prompt_file]
+#
+# Required:
+#   --prd <name>      Feature/workspace name (e.g., "my-feature")
+#                     Creates workspace at ralph/workspaces/<name>/
 #
 # Arguments:
-#   max_iterations  Maximum number of iterations (default: 10)
-#   prompt_file     Path to custom prompt file (default: prompts/agent.md)
+#   max_iterations    Maximum number of iterations (default: 10)
+#   prompt_file       Path to custom prompt file (default: prompts/agent.md)
 #
 # Options:
 #   --context <path>  Add context file or directory (repeatable)
@@ -20,9 +24,18 @@ RALPH_DIR="$SCRIPT_DIR"
 MAX_ITERATIONS=10
 PROMPT_FILE=""
 CONTEXT_ARGS=()
+PRD_NAME=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --prd)
+      PRD_NAME="$2"
+      shift 2
+      ;;
+    --prd=*)
+      PRD_NAME="${1#*=}"
+      shift
+      ;;
     --context)
       CONTEXT_ARGS+=("$2")
       shift 2
@@ -32,7 +45,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     *)
-      # Positional args: first is max_iterations, second is prompt_file
+      # Positional args: first numeric is max_iterations, first non-numeric is prompt_file
       if [ -z "$PROMPT_FILE" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
         MAX_ITERATIONS="$1"
       elif [ -z "$PROMPT_FILE" ]; then
@@ -43,11 +56,17 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Validate --prd is provided
+if [ -z "$PRD_NAME" ]; then
+  echo "Error: --prd <name> is required"
+  echo "Usage: ./ralph.sh --prd <name> [max_iterations] [prompt_file] [--context <path>...]"
+  exit 1
+fi
+
 # Default prompt file
 if [ -z "$PROMPT_FILE" ]; then
   PROMPT_FILE="$RALPH_DIR/prompts/agent.md"
 elif [[ "$PROMPT_FILE" != /* ]]; then
-  # Relative path - resolve from current directory
   PROMPT_FILE="$(pwd)/$PROMPT_FILE"
 fi
 
@@ -55,7 +74,6 @@ fi
 resolve_context() {
   local RESOLVED=()
   for arg in "${CONTEXT_ARGS[@]}"; do
-    # Resolve to absolute path
     local abs_path
     if [[ "$arg" = /* ]]; then
       abs_path="$arg"
@@ -75,7 +93,6 @@ resolve_context() {
     fi
   done
 
-  # Build context section text
   if [ ${#RESOLVED[@]} -gt 0 ]; then
     CONTEXT_SECTION="Context files (read all of these before starting work):"
     for f in "${RESOLVED[@]}"; do
@@ -89,49 +106,24 @@ resolve_context() {
 
 resolve_context
 
-PRD_FILE="$RALPH_DIR/prd.json"
-PROGRESS_FILE="$RALPH_DIR/progress.txt"
+# Workspace paths — all per-feature files live here
+WORKSPACE_DIR="$RALPH_DIR/workspaces/$PRD_NAME"
+mkdir -p "$WORKSPACE_DIR"
+
+PRD_FILE="$WORKSPACE_DIR/prd.json"
+PROGRESS_FILE="$WORKSPACE_DIR/progress.txt"
 ARCHIVE_DIR="$RALPH_DIR/archive"
-LAST_BRANCH_FILE="$RALPH_DIR/.last-branch"
+
+# Workspace-relative path (for prompt substitution, relative to project root)
+# Detect the relative path from the project root to the workspace
+PROJECT_ROOT="$(pwd)"
+WORKSPACE_REL="${WORKSPACE_DIR#$PROJECT_ROOT/}"
 
 # Metrics tracking
 RUN_ID=$(date +%Y%m%d_%H%M%S)
-METRICS_DIR="$RALPH_DIR/runs/$RUN_ID"
-CUMULATIVE_FILE="$RALPH_DIR/ralph_runs_cumulative.json"
+METRICS_DIR="$WORKSPACE_DIR/runs/$RUN_ID"
+CUMULATIVE_FILE="$WORKSPACE_DIR/ralph_runs_cumulative.json"
 mkdir -p "$METRICS_DIR"
-
-# Archive previous run if branch changed
-if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  LAST_BRANCH=$(cat "$LAST_BRANCH_FILE" 2>/dev/null || echo "")
-
-  if [ -n "$CURRENT_BRANCH" ] && [ -n "$LAST_BRANCH" ] && [ "$CURRENT_BRANCH" != "$LAST_BRANCH" ]; then
-    # Archive the previous run
-    DATE=$(date +%Y-%m-%d)
-    # Strip "ralph/" prefix from branch name for folder
-    FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
-    ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
-
-    echo "Archiving previous run: $LAST_BRANCH"
-    mkdir -p "$ARCHIVE_FOLDER"
-    [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
-    [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "   Archived to: $ARCHIVE_FOLDER"
-
-    # Reset progress file for new run
-    echo "# Ralph Progress Log" > "$PROGRESS_FILE"
-    echo "Started: $(date)" >> "$PROGRESS_FILE"
-    echo "---" >> "$PROGRESS_FILE"
-  fi
-fi
-
-# Track current branch
-if [ -f "$PRD_FILE" ]; then
-  CURRENT_BRANCH=$(jq -r '.branchName // empty' "$PRD_FILE" 2>/dev/null || echo "")
-  if [ -n "$CURRENT_BRANCH" ]; then
-    echo "$CURRENT_BRANCH" > "$LAST_BRANCH_FILE"
-  fi
-fi
 
 # Initialize progress file if it doesn't exist
 if [ ! -f "$PROGRESS_FILE" ]; then
@@ -146,7 +138,16 @@ if [ ! -f "$PROMPT_FILE" ]; then
   exit 1
 fi
 
-echo "Starting Ralph - Max iterations: $MAX_ITERATIONS"
+# Verify prd.json exists in workspace
+if [ ! -f "$PRD_FILE" ]; then
+  echo "Error: prd.json not found in workspace: $PRD_FILE"
+  echo "Create a PRD first using: @ralph/prompts/prd-creator.md"
+  echo "Then convert it: @ralph/prompts/prd-to-json.md"
+  exit 1
+fi
+
+echo "Starting Ralph - PRD: $PRD_NAME | Max iterations: $MAX_ITERATIONS"
+echo "Workspace: $WORKSPACE_DIR"
 echo "Using prompt: $PROMPT_FILE"
 
 # Function to format seconds as human readable time
@@ -170,7 +171,6 @@ print_diagnostics() {
   local json="$1"
   local iteration="$2"
 
-  # Extract values using jq
   local duration_ms=$(echo "$json" | jq -r '.duration_ms // 0')
   local duration_api_ms=$(echo "$json" | jq -r '.duration_api_ms // 0')
   local input_tokens=$(echo "$json" | jq -r '.usage.input_tokens // 0')
@@ -181,15 +181,11 @@ print_diagnostics() {
   local context_window=$(echo "$json" | jq -r '.modelUsage | to_entries[0].value.contextWindow // 200000')
   local num_turns=$(echo "$json" | jq -r '.num_turns // 0')
 
-  # Calculate totals
   local total_input=$((input_tokens + cache_read + cache_creation))
   local total_tokens=$((total_input + output_tokens))
-
-  # Estimate max context: cache_creation (unique cached content) + output_tokens (accumulated responses)
   local estimated_context=$((cache_creation + output_tokens))
   local context_pct=$(echo "scale=1; ($estimated_context * 100) / $context_window" | bc)
 
-  # Convert duration to seconds (integer for formatting)
   local duration_sec=$((duration_ms / 1000))
   local duration_api_sec=$((duration_api_ms / 1000))
   local time_str=$(format_time $duration_sec)
@@ -218,7 +214,6 @@ save_iteration_metrics() {
   local iteration="$2"
   local metrics_file="$METRICS_DIR/iteration_$(printf '%03d' $iteration).json"
 
-  # Extract values
   local duration_ms=$(echo "$json" | jq -r '.duration_ms // 0')
   local duration_api_ms=$(echo "$json" | jq -r '.duration_api_ms // 0')
   local input_tokens=$(echo "$json" | jq -r '.usage.input_tokens // 0')
@@ -249,7 +244,6 @@ summarize_run() {
   local completed=$1
   local total_iterations=$2
 
-  # Aggregate all iteration JSONs
   local total_duration_ms=0
   local total_duration_api_ms=0
   local total_input=0
@@ -313,7 +307,6 @@ EOF
 
   # Update cumulative file
   if [ -f "$CUMULATIVE_FILE" ]; then
-    # Add to existing cumulative data
     local prev_runs=$(jq -r '.total_runs // 0' "$CUMULATIVE_FILE")
     local prev_iterations=$(jq -r '.total_iterations // 0' "$CUMULATIVE_FILE")
     local prev_duration=$(jq -r '.total_duration_ms // 0' "$CUMULATIVE_FILE")
@@ -334,7 +327,6 @@ EOF
 }
 EOF
   else
-    # Create new cumulative file
     cat > "$CUMULATIVE_FILE" <<EOF
 {
   "total_runs": 1,
@@ -353,13 +345,14 @@ EOF
 for i in $(seq 1 $MAX_ITERATIONS); do
   echo ""
   echo "═══════════════════════════════════════════════════════"
-  echo "  Ralph Iteration $i of $MAX_ITERATIONS"
+  echo "  Ralph Iteration $i of $MAX_ITERATIONS [$PRD_NAME]"
   echo "═══════════════════════════════════════════════════════"
 
   # Run claude with the ralph prompt and capture JSON output
   PROMPT=$(cat "$PROMPT_FILE")
-  # Substitute {{CONTEXT_SECTION}} placeholder with resolved context paths
+  # Substitute placeholders
   PROMPT="${PROMPT//\{\{CONTEXT_SECTION\}\}/$CONTEXT_SECTION}"
+  PROMPT="${PROMPT//\{\{WORKSPACE\}\}/$WORKSPACE_REL}"
   ITERATION_START=$(date +%s)
 
   JSON_OUTPUT=$(claude -p "$PROMPT" --dangerously-skip-permissions --output-format json 2>&1) || true

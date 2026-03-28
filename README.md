@@ -99,13 +99,17 @@ Or create `ralph/prd.json` manually:
 
 ```bash
 # From your project root
-./ralph/ralph.sh [max_iterations] [prompt_file]
+./ralph/ralph.sh [max_iterations] [prompt_file] [--context <path>...]
 
 # Examples
-./ralph/ralph.sh              # 10 iterations (default), default prompt
-./ralph/ralph.sh 15           # 15 iterations, default prompt
-./ralph/ralph.sh 10 ./my-prompt.md  # Custom prompt file
+./ralph/ralph.sh                                          # 10 iterations, default prompt
+./ralph/ralph.sh 15                                       # 15 iterations
+./ralph/ralph.sh 15 --context docs/architecture.md        # With context file
+./ralph/ralph.sh 15 --context docs/ --context CLAUDE.md   # Multiple context sources
+./ralph/ralph.sh 10 ./my-prompt.md --context src/types/   # Custom prompt + context dir
 ```
+
+The `--context` flag is repeatable. Files are listed in the prompt for the agent to read at the start of each iteration. Directories are recursively expanded to include all files within.
 
 ### 4. Monitor Progress
 
@@ -206,6 +210,7 @@ ralph/
 - **One story per iteration**: Prevents context overflow. Each iteration starts fresh with no memory of previous work.
 - **Progress persistence**: `progress.txt` carries learnings between iterations. Codebase Patterns section survives cleanup.
 - **Quality gates from CLAUDE.md**: The agent prompt is project-agnostic. Project-specific quality checks live in the host project's `CLAUDE.md`.
+- **Context via `--context` flag**: Pass architecture docs, feature plans, or entire directories as context. Paths are listed in the prompt; the agent reads them at runtime. Like pral's `--context` flag.
 - **Branch tracking**: Auto-archives when PRD branch changes, preventing stale state.
 - **Metrics tracking**: Every iteration records duration, token usage, and cost as JSON for analysis.
 

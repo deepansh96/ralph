@@ -27,6 +27,7 @@ ralph/
 | Mechanism | How It Works |
 |-----------|-------------|
 | **Iteration loop** | `ralph.sh` runs `claude -p <prompt> --output-format json` up to N times |
+| **Context injection** | `--context` flag lists file paths in the prompt via `{{CONTEXT_SECTION}}` |
 | **One story per iteration** | Prompt enforces picking ONE story, implementing it, then stopping |
 | **Completion signal** | Agent emits `<promise>COMPLETE</promise>` when all stories pass |
 | **Branch tracking** | `.last-branch` file detects branch changes and auto-archives |
@@ -39,8 +40,10 @@ ralph/
 
 ```bash
 # Run ralph (from the project root, not ralph/)
-./ralph/ralph.sh 15                          # 15 iterations, default prompt
-./ralph/ralph.sh 10 ./my-custom-prompt.md    # Custom prompt
+./ralph/ralph.sh 15                                        # 15 iterations, default prompt
+./ralph/ralph.sh 15 --context docs/architecture.md         # With context file
+./ralph/ralph.sh 15 --context docs/ --context CLAUDE.md    # Multiple context sources
+./ralph/ralph.sh 10 ./my-custom-prompt.md --context src/   # Custom prompt + context
 
 # Archive completed feature
 ./ralph/cleanup.sh

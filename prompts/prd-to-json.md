@@ -130,7 +130,7 @@ Frontend stories are NOT complete until visually verified. Ralph will use the ag
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
 6. **Always add testing criteria**: Backend stories get test criterion; frontend stories get build/lint/test criteria
-7. **Context files in description**: The `description` field of the prd.json must instruct Ralph to read key context files at the start of every story. If the project has a context document (e.g., `CLAUDE.md`, `docs/architecture.md`, or a project context file), include that. If a plan or design doc exists for the feature, include that too. Since Ralph has no memory between iterations, each story needs these pointers so the agent can orient itself. Format: append to the description string — `"IMPORTANT: At the start of every story, read these files for full context before making any changes: (1) CLAUDE.md — project architecture and conventions; (2) [path to feature plan/design doc if one exists]."`
+7. **Context files are provided via CLI**: Context files (architecture docs, feature plans, etc.) are passed to Ralph via the `--context` flag when running `ralph.sh`. They are injected into the agent prompt automatically. Do NOT embed context file paths in the `description` field — the runner handles this.
 8. **Final review story must update project context**: The last story (review/wrap-up) must always include an acceptance criterion to update the project's context documentation (e.g., `CLAUDE.md` or a dedicated context file) with any relevant changes from the feature (new components, new patterns, new routes, changed conventions, etc.). This keeps the project context accurate for future Ralph iterations and human developers.
 
 ---
@@ -174,7 +174,7 @@ Add ability to mark tasks with different statuses.
 {
   "project": "TaskApp",
   "branchName": "ralph/task-status",
-  "description": "Task Status Feature - Track task progress with status indicators. IMPORTANT: At the start of every story, read CLAUDE.md for project architecture and conventions.",
+  "description": "Task Status Feature - Track task progress with status indicators",
   "userStories": [
     {
       "id": "US-001",
@@ -266,7 +266,6 @@ Before writing prd.json, verify:
 - [ ] UI stories have "Verify in browser using agent-browser" as criterion
 - [ ] Acceptance criteria are verifiable (not vague)
 - [ ] No story depends on a later story
-- [ ] `description` field includes instruction to read project context files at the start of every story
 - [ ] Final review story includes criterion to update project context documentation
 
 ---

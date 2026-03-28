@@ -1,27 +1,93 @@
 #!/bin/bash
 # Ralph - Autonomous AI agent loop for feature implementation
-# Usage: ./ralph.sh [max_iterations] [prompt_file]
+# Usage: ./ralph.sh [options] [max_iterations] [prompt_file]
 #
 # Arguments:
 #   max_iterations  Maximum number of iterations (default: 10)
 #   prompt_file     Path to custom prompt file (default: prompts/agent.md)
+#
+# Options:
+#   --context <path>  Add context file or directory (repeatable)
+#                     Files are listed in the prompt for the agent to read.
+#                     Directories are recursively expanded to all files within.
 
 set -e
 
-MAX_ITERATIONS=${1:-10}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RALPH_DIR="$SCRIPT_DIR"
 
-# Handle prompt file path (default to prompts/agent.md)
-if [ -z "$2" ]; then
+# Parse arguments
+MAX_ITERATIONS=10
+PROMPT_FILE=""
+CONTEXT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --context)
+      CONTEXT_ARGS+=("$2")
+      shift 2
+      ;;
+    --context=*)
+      CONTEXT_ARGS+=("${1#*=}")
+      shift
+      ;;
+    *)
+      # Positional args: first is max_iterations, second is prompt_file
+      if [ -z "$PROMPT_FILE" ] && [[ "$1" =~ ^[0-9]+$ ]]; then
+        MAX_ITERATIONS="$1"
+      elif [ -z "$PROMPT_FILE" ]; then
+        PROMPT_FILE="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Default prompt file
+if [ -z "$PROMPT_FILE" ]; then
   PROMPT_FILE="$RALPH_DIR/prompts/agent.md"
-elif [[ "$2" = /* ]]; then
-  # Absolute path
-  PROMPT_FILE="$2"
-else
+elif [[ "$PROMPT_FILE" != /* ]]; then
   # Relative path - resolve from current directory
-  PROMPT_FILE="$(pwd)/$2"
+  PROMPT_FILE="$(pwd)/$PROMPT_FILE"
 fi
+
+# Resolve context paths and build context section
+resolve_context() {
+  local RESOLVED=()
+  for arg in "${CONTEXT_ARGS[@]}"; do
+    # Resolve to absolute path
+    local abs_path
+    if [[ "$arg" = /* ]]; then
+      abs_path="$arg"
+    else
+      abs_path="$(pwd)/$arg"
+    fi
+
+    if [ -f "$abs_path" ]; then
+      RESOLVED+=("$abs_path")
+    elif [ -d "$abs_path" ]; then
+      while IFS= read -r -d '' f; do
+        RESOLVED+=("$f")
+      done < <(find "$abs_path" -type f -print0 | sort -z)
+    else
+      echo "Error: Context path not found: $arg"
+      exit 1
+    fi
+  done
+
+  # Build context section text
+  if [ ${#RESOLVED[@]} -gt 0 ]; then
+    CONTEXT_SECTION="Context files (read all of these before starting work):"
+    for f in "${RESOLVED[@]}"; do
+      CONTEXT_SECTION="$CONTEXT_SECTION
+- $f"
+    done
+  else
+    CONTEXT_SECTION=""
+  fi
+}
+
+resolve_context
 
 PRD_FILE="$RALPH_DIR/prd.json"
 PROGRESS_FILE="$RALPH_DIR/progress.txt"
@@ -292,6 +358,8 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
   # Run claude with the ralph prompt and capture JSON output
   PROMPT=$(cat "$PROMPT_FILE")
+  # Substitute {{CONTEXT_SECTION}} placeholder with resolved context paths
+  PROMPT="${PROMPT//\{\{CONTEXT_SECTION\}\}/$CONTEXT_SECTION}"
   ITERATION_START=$(date +%s)
 
   JSON_OUTPUT=$(claude -p "$PROMPT" --dangerously-skip-permissions --output-format json 2>&1) || true

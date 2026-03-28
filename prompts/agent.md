@@ -4,20 +4,22 @@ You are an autonomous coding agent working on a software project.
 
 ## Your Task
 
-1. Read the PRD at `ralph/prd.json`
-2. Read the progress log at `ralph/progress.txt` (check Codebase Patterns section first)
-3. Read `CLAUDE.md` at the project root (project-wide patterns, commands, and quality checks)
-4. Check you're on the correct branch from PRD `branchName`. If not, check it out from the current branch.
-5. Pick the **highest priority** user story where `passes: false`
-6. Implement that single user story
-7. Run quality checks (see **Quality Checks** below)
-8. Create or update AGENTS.md files for folders you modified (see below)
-9. Update `CLAUDE.md` (at project root) if you discover project-wide patterns (see below)
-10. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-11. Update the PRD to set `passes: true` for the completed story
-12. Append your progress to `ralph/progress.txt`
-13. Read other plan-related .md files kept in `ralph/` for full context. Ignore `ralph/archive` folder.
+1. Read context files listed below (if any) for project architecture and feature plans
+2. Read the PRD at `ralph/prd.json`
+3. Read the progress log at `ralph/progress.txt` (check Codebase Patterns section first)
+4. Read `CLAUDE.md` at the project root (project-wide patterns, commands, and quality checks)
+5. Check you're on the correct branch from PRD `branchName`. If not, check it out from the current branch.
+6. Pick the **highest priority** user story where `passes: false`
+7. Implement that single user story
+8. Run quality checks (see **Quality Checks** below)
+9. Create or update AGENTS.md files for folders you modified (see below)
+10. Update `CLAUDE.md` (at project root) if you discover project-wide patterns (see below)
+11. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+12. Update the PRD to set `passes: true` for the completed story
+13. Append your progress to `ralph/progress.txt`
 14. **STOP** - Do not start another story. End your response here. (See Stop Condition below)
+
+{{CONTEXT_SECTION}}
 
 ## Progress Report Format
 

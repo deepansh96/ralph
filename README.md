@@ -154,7 +154,7 @@ Ralph reads quality check commands from your project's `CLAUDE.md`. Add a sectio
 - E2E: `./run_tests.sh [spec-file]`
 ```
 
-The agent prompt (`prompts/agent.md`) tells Claude to follow whatever quality checks your `CLAUDE.md` defines. No need to modify ralph's files.
+The agent prompt (`prompts/agent.md`) tells the agent to follow whatever quality checks your `CLAUDE.md` defines. No need to modify ralph's files.
 
 ### Custom Prompt
 

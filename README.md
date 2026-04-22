@@ -33,7 +33,7 @@ Ralph repeats this until all stories pass (`<promise>COMPLETE</promise>`) or max
 
 - At least one agent CLI:
   - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command)
-  - [Codex CLI](https://github.com/openai/codex) (`codex` command) — requires `codex exec`, `--json`, `--output-last-message`, `--sandbox workspace-write`
+  - [Codex CLI](https://github.com/openai/codex) (`codex` command) — requires `codex exec`, `--json`, `--output-last-message`, `--sandbox danger-full-access`
 - `jq` (JSON processor)
 - `bc` (calculator, usually pre-installed)
 

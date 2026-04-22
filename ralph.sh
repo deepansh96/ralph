@@ -600,7 +600,7 @@ run_codex() {
   stderr_file=$(mktemp)
   last_message_file=$(mktemp)
 
-  local codex_flags=(--skip-git-repo-check --sandbox workspace-write --json --output-last-message "$last_message_file")
+  local codex_flags=(--skip-git-repo-check --sandbox danger-full-access --json --output-last-message "$last_message_file")
   if [ "$MULTI_AGENT" = true ]; then
     codex_flags+=(--enable multi_agent)
   fi

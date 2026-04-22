@@ -114,7 +114,7 @@ Ralph prints a diagnostics table after each iteration:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  ITERATION 3  DIAGNOSTICS                        │
+│  ITERATION 3  DIAGNOSTICS (claude)               │
 ├──────────────────────────────────────────────────┤
 │  ⏱  Time:   3m 42s     API: 3m 12s              │
 │  🔄 Turns:  47                                   │

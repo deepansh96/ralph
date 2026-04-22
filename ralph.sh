@@ -43,6 +43,7 @@ usage() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --prd)
+      [[ -n "${2:-}" ]] || { echo "Error: --prd requires a value"; usage; }
       PRD_NAME="$2"
       shift 2
       ;;
@@ -51,6 +52,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --agent)
+      [[ -n "${2:-}" ]] || { echo "Error: --agent requires a value"; usage; }
       AGENT_MODE="$2"
       shift 2
       ;;
@@ -63,6 +65,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --context)
+      [[ -n "${2:-}" ]] || { echo "Error: --context requires a value"; usage; }
       CONTEXT_ARGS+=("$2")
       shift 2
       ;;
@@ -98,7 +101,7 @@ fi
 # --- Utility helpers ---
 
 is_number() {
-  [[ "$1" =~ ^[0-9]+([.][0-9]+)?$ ]]
+  [[ "$1" =~ ^[0-9]*\.?[0-9]+$ ]]
 }
 
 json_number_or_null() {
@@ -342,6 +345,7 @@ save_iteration_metrics() {
       output_tokens: .output_tokens,
       cache_read_tokens: .cache_read_tokens,
       cache_creation_tokens: .cache_creation_tokens,
+      context_window: .context_window,
       cost_usd: .cost_usd
     }' > "$metrics_file"
 }
@@ -426,6 +430,7 @@ summarize_run() {
     --argjson completed "$completed" \
     --argjson iterations "$iteration_count" \
     --argjson total_duration_ms "$total_duration_ms" \
+    --argjson total_duration_api_ms "$(json_number_or_null "$( [ "$api_duration_available" = true ] && echo "$total_duration_api_ms" || echo "")")" \
     --argjson total_turns "$total_turns" \
     --argjson total_input "$total_input" \
     --argjson total_output "$total_output" \
@@ -439,6 +444,7 @@ summarize_run() {
       completed: $completed,
       iterations: $iterations,
       total_duration_ms: $total_duration_ms,
+      total_duration_api_ms: $total_duration_api_ms,
       total_turns: $total_turns,
       total_input_tokens: $total_input,
       total_output_tokens: $total_output,

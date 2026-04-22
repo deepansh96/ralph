@@ -4,13 +4,13 @@ Autonomous AI agent loop for iterative feature implementation.
 
 ## About
 
-Ralph orchestrates Claude Code in a loop to implement features story-by-story from a PRD (Product Requirements Document). Each iteration picks one user story, implements it, runs quality checks, commits, and stops. The loop continues until all stories pass.
+Ralph orchestrates a coding agent (Claude Code or Codex CLI) in a loop to implement features story-by-story from a PRD (Product Requirements Document). Each iteration picks one user story, implements it, runs quality checks, commits, and stops. The loop continues until all stories pass.
 
 ## Structure
 
 ```
 ralph/
-├── ralph.sh              # Main loop script (~330 lines bash)
+├── ralph.sh              # Main loop script (~730 lines bash)
 ├── cleanup.sh            # Archive completed runs
 ├── prompts/
 │   ├── agent.md          # Default agent prompt (project-agnostic)

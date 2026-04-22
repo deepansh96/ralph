@@ -2,15 +2,15 @@
 
 Autonomous AI agent loop that implements features story-by-story from a PRD.
 
-Ralph runs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) in a loop. Each iteration picks one user story from a PRD, implements it completely (code + tests + commit), and stops. The loop continues until every story passes or the iteration limit is reached.
+Ralph runs a coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Codex CLI](https://github.com/openai/codex)) in a loop. Each iteration picks one user story from a PRD, implements it completely (code + tests + commit), and stops. The loop continues until every story passes or the iteration limit is reached.
 
 ## How It Works
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│  prd.json   │────>│  ralph.sh    │────>│  Claude Code │
-│  (stories)  │     │  (loop)      │     │  (1 story)   │
-└─────────────┘     └──────┬───────┘     └──────┬───────┘
+┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
+│  prd.json   │────>│  ralph.sh    │────>│  Claude / Codex  │
+│  (stories)  │     │  (loop)      │     │  (1 story)       │
+└─────────────┘     └──────┬───────┘     └──────┬───────────┘
                            │                     │
                     ┌──────▼───────┐     ┌──────▼───────┐
                     │  metrics/    │     │  commit +    │
@@ -31,7 +31,9 @@ Ralph repeats this until all stories pass (`<promise>COMPLETE</promise>`) or max
 
 ## Prerequisites
 
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command available)
+- At least one agent CLI:
+  - [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) (`claude` command)
+  - [Codex CLI](https://github.com/openai/codex) (`codex` command) — requires `codex exec`, `--json`, `--output-last-message`, `--sandbox workspace-write`
 - `jq` (JSON processor)
 - `bc` (calculator, usually pre-installed)
 
@@ -77,17 +79,34 @@ Both steps create a workspace folder at `ralph/workspaces/[feature-name]/` conta
 
 ```bash
 # From your project root
-./ralph/ralph.sh --prd <name> [max_iterations] [prompt_file] [--context <path>...]
+./ralph/ralph.sh --prd <name> [--agent auto|claude|codex] [max_iterations] [prompt_file] [--context <path>...]
 
 # Examples
-./ralph/ralph.sh --prd my-feature                                       # 10 iterations, default prompt
+./ralph/ralph.sh --prd my-feature                                       # 10 iterations, auto-detect agent
 ./ralph/ralph.sh --prd my-feature 15                                    # 15 iterations
+./ralph/ralph.sh --prd my-feature 15 --agent codex                      # Use Codex CLI
+./ralph/ralph.sh --prd my-feature 15 --agent claude                     # Use Claude Code
 ./ralph/ralph.sh --prd my-feature 15 --context docs/architecture.md     # With context file
 ./ralph/ralph.sh --prd my-feature 15 --context docs/ --context CLAUDE.md  # Multiple context sources
+./ralph/ralph.sh --prd my-feature 15 --no-multi-agent                   # Disable Codex sub-agent spawning
 ```
 
 - `--prd` is required — identifies the workspace at `ralph/workspaces/<name>/`
+- `--agent` selects the backend: `auto` (default, prefers Claude), `claude`, or `codex`
 - `--context` is repeatable — files are listed in the prompt for the agent to read at the start of each iteration. Directories are recursively expanded.
+- `--no-multi-agent` disables Codex's `--enable multi_agent` flag (on by default)
+
+### Agent Differences
+
+| Aspect | Claude Code | Codex CLI |
+|--------|------------|-----------|
+| Cost tracking | Per-iteration USD cost | Not available (shows "n/a") |
+| API duration | Available | Not available (shows "n/a") |
+| Context window % | Displayed | Not available (shows "n/a") |
+| Prompt delivery | `-p` flag | Piped via stdin |
+| Output format | Single JSON object | JSONL event stream |
+
+`CLAUDE.md` is a project convention file read by both agents — it is not specific to Claude Code.
 
 ### 4. Monitor Progress
 
@@ -183,12 +202,13 @@ ralph/
 
 ## Key Design Decisions
 
+- **Agent-agnostic**: Works with Claude Code or Codex CLI. Auto-detection prefers Claude when both are available.
 - **One story per iteration**: Prevents context overflow. Each iteration starts fresh with no memory of previous work.
 - **Per-PRD workspaces**: Each feature gets its own folder at `ralph/workspaces/<name>/`. All state (prd.json, progress.txt, metrics) is isolated. Archive moves the whole folder.
 - **Progress persistence**: `progress.txt` carries learnings between iterations within a workspace.
 - **Quality gates from CLAUDE.md**: The agent prompt is project-agnostic. Project-specific quality checks live in the host project's `CLAUDE.md`.
 - **Context via `--context` flag**: Pass architecture docs, feature plans, or entire directories as context. Paths are listed in the prompt; the agent reads them at runtime. Like pral's `--context` flag.
-- **Metrics tracking**: Every iteration records duration, token usage, and cost as JSON for analysis.
+- **Metrics tracking**: Every iteration records duration, token usage, and cost as JSON for analysis. Metrics unavailable from a given agent (e.g., Codex cost) are stored as `null` and displayed as "n/a".
 
 ## Companion Tool: PRAL
 

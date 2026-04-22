@@ -26,7 +26,8 @@ ralph/
 
 | Mechanism | How It Works |
 |-----------|-------------|
-| **Iteration loop** | `ralph.sh` runs `claude -p <prompt> --output-format json` up to N times |
+| **Iteration loop** | `ralph.sh` runs the selected agent (claude or codex) up to N times |
+| **Agent selection** | `--agent auto\|claude\|codex` chooses backend; auto prefers claude |
 | **Per-PRD workspaces** | `--prd <name>` creates isolated folder at `workspaces/<name>/` |
 | **Context injection** | `--context` flag lists file paths in the prompt via `{{CONTEXT_SECTION}}` |
 | **Prompt placeholders** | `{{WORKSPACE}}` and `{{CONTEXT_SECTION}}` are substituted at runtime |
@@ -41,7 +42,10 @@ ralph/
 
 ```bash
 # Run ralph (from the project root, not ralph/)
-./ralph/ralph.sh --prd my-feature 15                                # 15 iterations
+./ralph/ralph.sh --prd my-feature 15                                # 15 iterations (auto-detect agent)
+./ralph/ralph.sh --prd my-feature 15 --agent claude                 # Force Claude Code
+./ralph/ralph.sh --prd my-feature 15 --agent codex                  # Force Codex CLI
+./ralph/ralph.sh --prd my-feature 15 --agent auto                   # Auto-detect (default)
 ./ralph/ralph.sh --prd my-feature 15 --context docs/architecture.md # With context
 ./ralph/ralph.sh --prd my-feature 15 --context docs/ --context CLAUDE.md
 

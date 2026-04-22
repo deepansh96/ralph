@@ -4,13 +4,13 @@ Autonomous AI agent loop for iterative feature implementation.
 
 ## About
 
-Ralph orchestrates Claude Code in a loop to implement features story-by-story from a PRD (Product Requirements Document). Each iteration picks one user story, implements it, runs quality checks, commits, and stops. The loop continues until all stories pass.
+Ralph orchestrates a coding agent (Claude Code or Codex CLI) in a loop to implement features story-by-story from a PRD (Product Requirements Document). Each iteration picks one user story, implements it, runs quality checks, commits, and stops. The loop continues until all stories pass.
 
 ## Structure
 
 ```
 ralph/
-├── ralph.sh              # Main loop script (~330 lines bash)
+├── ralph.sh              # Main loop script (~730 lines bash)
 ├── cleanup.sh            # Archive completed runs
 ├── prompts/
 │   ├── agent.md          # Default agent prompt (project-agnostic)
@@ -26,7 +26,8 @@ ralph/
 
 | Mechanism | How It Works |
 |-----------|-------------|
-| **Iteration loop** | `ralph.sh` runs `claude -p <prompt> --output-format json` up to N times |
+| **Iteration loop** | `ralph.sh` runs the selected agent (claude or codex) up to N times |
+| **Agent selection** | `--agent auto\|claude\|codex` chooses backend; auto prefers claude |
 | **Per-PRD workspaces** | `--prd <name>` creates isolated folder at `workspaces/<name>/` |
 | **Context injection** | `--context` flag lists file paths in the prompt via `{{CONTEXT_SECTION}}` |
 | **Prompt placeholders** | `{{WORKSPACE}}` and `{{CONTEXT_SECTION}}` are substituted at runtime |
@@ -41,7 +42,10 @@ ralph/
 
 ```bash
 # Run ralph (from the project root, not ralph/)
-./ralph/ralph.sh --prd my-feature 15                                # 15 iterations
+./ralph/ralph.sh --prd my-feature 15                                # 15 iterations (auto-detect agent)
+./ralph/ralph.sh --prd my-feature 15 --agent claude                 # Force Claude Code
+./ralph/ralph.sh --prd my-feature 15 --agent codex                  # Force Codex CLI
+./ralph/ralph.sh --prd my-feature 15 --agent auto                   # Auto-detect (default)
 ./ralph/ralph.sh --prd my-feature 15 --context docs/architecture.md # With context
 ./ralph/ralph.sh --prd my-feature 15 --context docs/ --context CLAUDE.md
 

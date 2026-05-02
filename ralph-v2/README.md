@@ -37,7 +37,7 @@ grill -> init -> run -> cleanup
 During `run`, Ralph executes:
 
 ```text
-review-decisions -> create-prd -> create-slices -> preflight -> implement-slice... -> final-review -> pr-review
+review-decisions -> create-prd -> create-slices -> preflight -> implement-slice... -> final-review -> pr-review -> review-fixes
 ```
 
 ## State
@@ -100,6 +100,7 @@ Failed steps stop the pipeline until the user explicitly resets the step to `pen
 - `implement-slice`: reads the assigned sub-issue, follows TDD, commits, pushes, and closes the sub-issue.
 - `final-review`: reviews branch changes, runs quality checks, verifies acceptance criteria, and writes `final-review.md`.
 - `pr-review`: creates or updates the PR and invokes `code-review:code-review`.
+- `review-fixes`: evaluates automated review findings, implements fixes for valid issues, dismisses false positives, and posts a summary comment on the PR.
 
 ## Bundled Skills
 

@@ -10,7 +10,7 @@ Base branch: {{BASE_BRANCH}}
 
 ## Goal
 
-Validate that implementation can start from a clean, explicit base branch; create and push the feature branch; read the AFK implementation sub-issues from GitHub; and extend `{{WORKSPACE}}/state.json` with dynamic implementation, final review, and PR review steps.
+Validate that implementation can start from a clean, explicit base branch; create and push the feature branch; read the AFK implementation sub-issues from GitHub; and extend `{{WORKSPACE}}/state.json` with dynamic implementation, final review, PR review, and review-fixes steps.
 
 ## Required Inputs
 
@@ -50,7 +50,7 @@ Create the feature branch from `baseBranch`.
 
 ## Dynamic Steps
 
-Read the implementation sub-issues created by the `create-slices` step and append one implementation step per sub-issue, followed by final review and PR review.
+Read the implementation sub-issues created by the `create-slices` step and append one implementation step per sub-issue, followed by final review, PR review, and review-fixes.
 
 Each implementation step must use this shape:
 
@@ -99,6 +99,20 @@ Append the final steps after all implementation steps:
 }
 ```
 
+```json
+{
+  "id": "review-fixes",
+  "phase": "dynamic",
+  "type": "review-fixes",
+  "status": "pending",
+  "agent": "claude",
+  "reviewer": null,
+  "hitl": false,
+  "metrics": null,
+  "notes": ""
+}
+```
+
 Use `state_add_steps "{{WORKSPACE}}/state.json" '<json-array>'` to extend the state file. `state_add_steps` prevents duplicate step IDs and writes atomically.
 
 ## Idempotency
@@ -124,5 +138,6 @@ Confirm the status output shows the fixed pipeline plus all dynamic steps:
 - N `implement-slice` steps with `agent` set to `codex` and the correct `sub_issue` value for each GitHub sub-issue
 - `final-review` with `agent` set to `claude`
 - `pr-review` with `agent` set to `claude`
+- `review-fixes` with `agent` set to `claude`
 
 Complete normally only after the branch is pushed, the `branch` field is updated, sub-issues are read from GitHub, and state contains the full dynamic pipeline.

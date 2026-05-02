@@ -993,6 +993,67 @@ PR_REVIEW
       total_cost_usd: 0.07
     }'
     ;;
+  review-fixes)
+    [[ "$prompt" == *"pr-review.md"* ]] || exit 161
+    [[ "$prompt" == *"final-review.md"* ]] || exit 162
+    [[ "$prompt" == *"gh api"* ]] || exit 163
+    [[ "$prompt" == *"code-review:code-review"* ]] || exit 164
+    [[ "$prompt" == *"Fix"* ]] || exit 165
+    [[ "$prompt" == *"Dismiss"* ]] || exit 166
+    [[ "$prompt" == *"gh pr comment"* ]] || exit 167
+    cat > "$workspace/review-fixes-comment.md" <<'COMMENT'
+## Review Fixes Assessment
+
+### 1. Missing error handling in dashboard.sh
+
+**Disposition:** Fixed
+
+**Reasoning:** Valid — added set -e and error check.
+
+## Summary
+
+- Total findings: 1
+- Fixed: 1
+- Dismissed: 0
+COMMENT
+    cat > "$workspace/review-fixes.md" <<'REVIEW_FIXES'
+# Review Fixes
+
+## PR
+
+- PR number: #77
+- PR URL: https://github.com/deepansh96/ralph/pull/77
+
+## Findings Evaluated
+
+### 1. Missing error handling in dashboard.sh
+
+**Finding:** dashboard.sh does not exit on error.
+
+**Disposition:** Fixed
+
+**Reasoning:** Valid concern — added set -e.
+
+**Changes:** dashboard/dashboard.sh
+
+## Summary
+
+- Total findings: 1
+- Fixed: 1
+- Dismissed: 0
+- Commit: abc1234
+- Quality checks: passed
+REVIEW_FIXES
+    jq -n '{
+      result: "review-fixes evaluated 1 finding, fixed 1, dismissed 0",
+      duration_ms: 444,
+      usage: {
+        input_tokens: 10,
+        output_tokens: 9
+      },
+      total_cost_usd: 0.05
+    }'
+    ;;
   *)
     echo "unexpected step: $step_id" >&2
     exit 170
@@ -1865,6 +1926,7 @@ test_preflight_prompt_defines_full_preflight_workflow_contract() {
   assert_contains "$prompt" "implement-slice"
   assert_contains "$prompt" "final-review"
   assert_contains "$prompt" "pr-review"
+  assert_contains "$prompt" "review-fixes"
   assert_contains "$prompt" "codex"
   assert_contains "$prompt" "sub_issue"
   assert_contains "$prompt" "idempotent"
@@ -1965,6 +2027,39 @@ test_pr_review_prompt_defines_full_pr_workflow_contract() {
   assert_contains "$prompt" "Do not create duplicate PRs"
 }
 
+test_review_fixes_prompt_defines_full_review_fixes_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/review-fixes.md"
+  [[ -f "$prompt_file" ]] || fail "expected review-fixes prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "Issue: {{ISSUE}}"
+  assert_contains "$prompt" "Repo: {{REPO}}"
+  assert_contains "$prompt" "Workspace: {{WORKSPACE}}"
+  assert_contains "$prompt" "Branch: {{BRANCH}}"
+  assert_contains "$prompt" "Base branch: {{BASE_BRANCH}}"
+  assert_contains "$prompt" "Step: {{STEP_ID}}"
+  assert_contains "$prompt" "Skills: {{SKILLS_DIR}}"
+  assert_contains "$prompt" "agent: claude"
+  assert_contains "$prompt" "pr-review.md"
+  assert_contains "$prompt" "final-review.md"
+  assert_contains "$prompt" "gh api"
+  assert_contains "$prompt" "issues/<pr-number>/comments"
+  assert_contains "$prompt" "pulls/<pr-number>/comments"
+  assert_contains "$prompt" "code-review:code-review"
+  assert_contains "$prompt" "Fix"
+  assert_contains "$prompt" "Dismiss"
+  assert_contains "$prompt" "Run quality checks from CLAUDE.md"
+  assert_contains "$prompt" "git commit"
+  assert_contains "$prompt" "git push"
+  assert_contains "$prompt" "gh pr comment"
+  assert_contains "$prompt" "review-fixes-comment.md"
+  assert_contains "$prompt" "review-fixes.md"
+  assert_contains "$prompt" "zero"
+}
+
 test_skills_bundle_is_self_contained_and_readme_documents_workflow() {
   local required_files readme global_skill_ref stale_refs broken_links link_records file target target_without_anchor resolved
 
@@ -2026,6 +2121,7 @@ test_skills_bundle_is_self_contained_and_readme_documents_workflow() {
   assert_contains "$(<"$readme")" "review-decisions"
   assert_contains "$(<"$readme")" "implement-slice"
   assert_contains "$(<"$readme")" "pr-review"
+  assert_contains "$(<"$readme")" "review-fixes"
 }
 
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
@@ -2106,6 +2202,17 @@ test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
       "status": "pending",
       "metrics": null,
       "notes": ""
+    },
+    {
+      "id": "review-fixes",
+      "phase": "dynamic",
+      "type": "review-fixes",
+      "agent": "claude",
+      "reviewer": null,
+      "hitl": false,
+      "status": "pending",
+      "metrics": null,
+      "notes": ""
     }
   ]'
 
@@ -2113,10 +2220,11 @@ test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
   agents="$(jq -r '.steps[] | select(.phase == "dynamic") | "\(.type):\(.agent)"' "$state_file" | tr '\n' ' ')"
   sub_issues="$(jq -r '.steps[] | select(.type == "implement-slice") | .sub_issue' "$state_file" | tr '\n' ' ')"
 
-  assert_contains "$ids" "preflight implement-slice-9101 implement-slice-9102 final-review pr-review"
+  assert_contains "$ids" "preflight implement-slice-9101 implement-slice-9102 final-review pr-review review-fixes"
   assert_contains "$agents" "implement-slice:codex"
   assert_contains "$agents" "final-review:claude"
   assert_contains "$agents" "pr-review:claude"
+  assert_contains "$agents" "review-fixes:claude"
   assert_contains "$sub_issues" "9101 9102"
 
   output="$("$RALPH" status --issue "$issue")"
@@ -2124,6 +2232,7 @@ test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
   assert_contains "$output" "implement-slice-9102"
   assert_contains "$output" "final-review"
   assert_contains "$output" "pr-review"
+  assert_contains "$output" "review-fixes"
 
   set +e
   duplicate_output="$(state_add_steps "$state_file" '[{"id":"implement-slice-9101","phase":"dynamic","type":"implement-slice","agent":"codex","status":"pending"}]' 2>&1)"
@@ -2132,7 +2241,7 @@ test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
 
   [[ "$status" -ne 0 ]] || fail "expected duplicate dynamic step id to fail"
   assert_contains "$duplicate_output" "duplicate step id"
-  [[ "$(jq '.steps | length' "$state_file")" == "5" ]] || fail "expected duplicate failure not to append steps"
+  [[ "$(jq '.steps | length' "$state_file")" == "6" ]] || fail "expected duplicate failure not to append steps"
 }
 
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
@@ -2441,6 +2550,17 @@ test_final_and_pr_review_pipeline_completes_with_idempotent_pr() {
           status: "pending",
           metrics: {},
           notes: ""
+        },
+        {
+          id: "review-fixes",
+          phase: "dynamic",
+          type: "review-fixes",
+          agent: "claude",
+          reviewer: null,
+          hitl: false,
+          status: "pending",
+          metrics: {},
+          notes: ""
         }
       ]
     }' > "$WORKSPACES_DIR/$issue/state.json"
@@ -2450,23 +2570,34 @@ test_final_and_pr_review_pipeline_completes_with_idempotent_pr() {
   final_file="$WORKSPACES_DIR/$issue/final-review.md"
   pr_body_file="$WORKSPACES_DIR/$issue/pr-body.md"
   pr_review_file="$WORKSPACES_DIR/$issue/pr-review.md"
+  review_fixes_file="$WORKSPACES_DIR/$issue/review-fixes.md"
+  review_fixes_comment="$WORKSPACES_DIR/$issue/review-fixes-comment.md"
   final_status="$(jq -r '.steps[] | select(.id == "final-review") | .status' "$WORKSPACES_DIR/$issue/state.json")"
   pr_status="$(jq -r '.steps[] | select(.id == "pr-review") | .status' "$WORKSPACES_DIR/$issue/state.json")"
+  rf_status="$(jq -r '.steps[] | select(.id == "review-fixes") | .status' "$WORKSPACES_DIR/$issue/state.json")"
 
   [[ "$final_status" == "completed" ]] || fail "expected final-review to complete, got $final_status"
   [[ "$pr_status" == "completed" ]] || fail "expected pr-review to complete, got $pr_status"
+  [[ "$rf_status" == "completed" ]] || fail "expected review-fixes to complete, got $rf_status"
   [[ -f "$final_file" ]] || fail "expected final-review.md to exist"
   [[ -f "$pr_body_file" ]] || fail "expected PR body file"
   [[ -f "$pr_review_file" ]] || fail "expected PR review record"
+  [[ -f "$review_fixes_file" ]] || fail "expected review-fixes.md to exist"
+  [[ -f "$review_fixes_comment" ]] || fail "expected review-fixes-comment.md to exist"
   assert_contains "$(<"$final_file")" "Acceptance criteria verification"
   assert_contains "$(<"$pr_body_file")" "## Summary"
   assert_contains "$(<"$pr_body_file")" "Closes #9111"
   assert_contains "$(<"$pr_body_file")" "Human QA Checklist"
   assert_contains "$(<"$pr_review_file")" "code-review:code-review invoked"
+  assert_contains "$(<"$review_fixes_file")" "Findings Evaluated"
+  assert_contains "$(<"$review_fixes_file")" "Fixed"
+  assert_contains "$(<"$review_fixes_comment")" "Review Fixes Assessment"
   assert_contains "$output" "final-review"
   assert_contains "$output" "pr-review"
+  assert_contains "$output" "review-fixes"
 
-  jq '(.steps[] | select(.id == "pr-review") | .status) = "pending"' "$WORKSPACES_DIR/$issue/state.json" > "$WORKSPACES_DIR/$issue/state.json.tmp"
+  jq '(.steps[] | select(.id == "pr-review") | .status) = "pending"
+    | (.steps[] | select(.id == "review-fixes") | .status) = "pending"' "$WORKSPACES_DIR/$issue/state.json" > "$WORKSPACES_DIR/$issue/state.json.tmp"
   mv "$WORKSPACES_DIR/$issue/state.json.tmp" "$WORKSPACES_DIR/$issue/state.json"
 
   PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
@@ -2509,6 +2640,7 @@ test_preflight_prompt_defines_full_preflight_workflow_contract
 test_implement_slice_prompt_defines_full_implementation_workflow_contract
 test_final_review_prompt_defines_full_review_workflow_contract
 test_pr_review_prompt_defines_full_pr_workflow_contract
+test_review_fixes_prompt_defines_full_review_fixes_workflow_contract
 test_skills_bundle_is_self_contained_and_readme_documents_workflow
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes

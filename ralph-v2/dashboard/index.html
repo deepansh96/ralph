@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ralph Pipeline Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <main>
+      <header class="page-header">
+        <h1>Pipeline Dashboard</h1>
+        <button id="refresh-button" type="button">Refresh</button>
+      </header>
+      <section id="dashboard-content" aria-live="polite"></section>
+    </main>
+    <script>
+      async function loadPipelines() {
+        const content = document.getElementById('dashboard-content');
+        content.textContent = 'Loading Pipelines...';
+        const response = await fetch('/api/workspaces');
+        const data = await response.json();
+
+        if (!data.workspaces || data.workspaces.length === 0) {
+          content.innerHTML = '<p class="empty-state">No active Pipelines found.</p>';
+          return;
+        }
+
+        content.innerHTML = '<table><thead><tr><th>Issue #</th><th>Repo</th><th>Branch</th><th>Status</th><th>Current Step</th><th>Steps Progress</th><th>Duration</th><th>Cost</th></tr></thead><tbody></tbody></table>';
+        const tbody = content.querySelector('tbody');
+        data.workspaces.forEach((workspace) => {
+          const row = document.createElement('tr');
+          const status = workspace.derivedStatus || 'pending';
+          row.innerHTML = `
+            <td>${escapeHtml(workspace.issue)}</td>
+            <td>${escapeHtml(workspace.repo)}</td>
+            <td>${escapeHtml(workspace.branch)}</td>
+            <td><span class="status status-${status}">${escapeHtml(status)}</span></td>
+            <td>${escapeHtml(workspace.currentStep || 'n/a')}</td>
+            <td>${renderStepProgress(workspace.steps || [])}</td>
+            <td>${formatDuration(workspace.totalDuration_ms || 0)}</td>
+            <td>${formatCost(workspace.totalCost_usd)}</td>
+          `;
+          tbody.appendChild(row);
+        });
+      }
+
+      function renderStepProgress(steps) {
+        return `<div class="step-progress" aria-label="${steps.length} Steps">${steps.map((step) => `<span class="step-segment status-${step.status}" title="${escapeHtml(step.id)}: ${escapeHtml(step.status)}"></span>`).join('')}</div>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[character]));
+      }
+
+      function formatDuration(durationMs) {
+        const totalSeconds = Math.floor(durationMs / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (minutes > 0) {
+          return `${minutes}m ${seconds}s`;
+        }
+        return `${seconds}s`;
+      }
+
+      function formatCost(cost) {
+        return cost == null ? 'n/a' : `$${Number(cost).toFixed(2)}`;
+      }
+
+      document.getElementById('refresh-button').addEventListener('click', loadPipelines);
+      loadPipelines();
+    </script>
+  </body>
+</html>

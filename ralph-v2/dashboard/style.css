@@ -1,0 +1,113 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f6f8fa;
+  color: #1f2328;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+main {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 32px auto;
+}
+
+.page-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 650;
+  margin: 0;
+}
+
+button {
+  background: #0969da;
+  border: 0;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 14px;
+}
+
+table {
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid #d0d7de;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  background: #f6f8fa;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 3px 8px;
+}
+
+.status-completed {
+  background: #dafbe1;
+  color: #116329;
+}
+
+.status-in_progress {
+  background: #ddf4ff;
+  color: #0969da;
+}
+
+.status-blocked {
+  background: #fff8c5;
+  color: #9a6700;
+}
+
+.status-failed {
+  background: #ffebe9;
+  color: #cf222e;
+}
+
+.status-pending {
+  background: #eaeef2;
+  color: #57606a;
+}
+
+.step-progress {
+  display: flex;
+  gap: 3px;
+  min-width: 96px;
+}
+
+.step-segment {
+  border-radius: 2px;
+  display: block;
+  height: 10px;
+  min-width: 18px;
+}
+
+.empty-state {
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  margin: 0;
+  padding: 24px;
+}

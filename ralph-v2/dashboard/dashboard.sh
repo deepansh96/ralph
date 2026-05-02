@@ -8,6 +8,7 @@ usage() {
   cat >&2 <<'USAGE'
 Usage:
   dashboard.sh aggregate [--workspaces-dir <path>]
+  dashboard.sh serve [--port <N>] [--workspaces-dir <path>]
 USAGE
 }
 
@@ -39,6 +40,11 @@ aggregate() {
   local workspaces_dir workspaces_file warnings_file state_file
 
   workspaces_dir="$(resolve_workspaces_dir "$@")"
+  if [[ ! -d "$workspaces_dir" ]]; then
+    echo "Error: workspaces directory does not exist or is not a directory: $workspaces_dir" >&2
+    return 1
+  fi
+
   workspaces_file="$(mktemp)"
   warnings_file="$(mktemp)"
 
@@ -131,6 +137,140 @@ aggregate() {
   rm -f "$workspaces_file" "$warnings_file"
 }
 
+serve() {
+  local port="8080"
+  local workspaces_dir
+
+  workspaces_dir="$(resolve_workspaces_dir)"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --port)
+        [[ $# -ge 2 ]] || {
+          echo "Error: --port requires a value" >&2
+          return 1
+        }
+        port="$2"
+        shift 2
+        ;;
+      --workspaces-dir)
+        [[ $# -ge 2 ]] || {
+          echo "Error: --workspaces-dir requires a path" >&2
+          return 1
+        }
+        workspaces_dir="$2"
+        shift 2
+        ;;
+      *)
+        echo "Error: unknown serve option: $1" >&2
+        usage
+        return 1
+        ;;
+    esac
+  done
+
+  command -v python3 >/dev/null 2>&1 || {
+    echo "Error: python3 is required for dashboard.sh serve" >&2
+    return 1
+  }
+  command -v jq >/dev/null 2>&1 || {
+    echo "Error: jq is required for dashboard.sh serve" >&2
+    return 1
+  }
+
+  echo "Dashboard: http://127.0.0.1:$port"
+  DASHBOARD_SCRIPT="$SCRIPT_DIR/dashboard.sh" DASHBOARD_DIR="$SCRIPT_DIR" RALPH_DASHBOARD_WORKSPACES_DIR="$workspaces_dir" RALPH_DASHBOARD_PORT="$port" python3 <<'PYTHON'
+import json
+import mimetypes
+import os
+import subprocess
+import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.parse import unquote, urlparse
+
+
+dashboard_script = os.environ["DASHBOARD_SCRIPT"]
+dashboard_dir = Path(os.environ["DASHBOARD_DIR"]).resolve()
+workspaces_dir = os.environ["RALPH_DASHBOARD_WORKSPACES_DIR"]
+port = int(os.environ["RALPH_DASHBOARD_PORT"])
+
+
+def fully_unquote(path):
+    decoded = path
+    for _ in range(5):
+        next_decoded = unquote(decoded)
+        if next_decoded == decoded:
+            return decoded
+        decoded = next_decoded
+    return decoded
+
+
+class DashboardHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/workspaces":
+            self.serve_workspaces()
+            return
+        self.serve_static(parsed.path)
+
+    def serve_workspaces(self):
+        result = subprocess.run(
+            [dashboard_script, "aggregate", "--workspaces-dir", workspaces_dir],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            message = result.stderr.strip() or result.stdout.strip() or "aggregate command failed"
+            self.send_json(500, {"error": "aggregate failed", "details": message})
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(result.stdout.encode("utf-8"))
+
+    def serve_static(self, raw_path):
+        decoded_path = fully_unquote(raw_path)
+        if "../" in decoded_path or decoded_path.startswith(".."):
+            self.send_error(403)
+            return
+
+        relative_path = "index.html" if decoded_path in ("", "/") else decoded_path.lstrip("/")
+        target = (dashboard_dir / relative_path).resolve()
+        if dashboard_dir not in target.parents and target != dashboard_dir:
+            self.send_error(403)
+            return
+        if not target.is_file():
+            self.send_error(404)
+            return
+
+        content_type = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.end_headers()
+        self.wfile.write(target.read_bytes())
+
+    def send_json(self, status, payload):
+        body = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        return
+
+
+try:
+    HTTPServer(("127.0.0.1", port), DashboardHandler).serve_forever()
+except KeyboardInterrupt:
+    sys.exit(0)
+PYTHON
+}
+
 main() {
   local command="${1:-}"
 
@@ -138,6 +278,10 @@ main() {
     aggregate)
       shift
       aggregate "$@"
+      ;;
+    serve)
+      shift
+      serve "$@"
       ;;
     *)
       usage

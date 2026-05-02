@@ -9,6 +9,12 @@ source "$SCRIPT_DIR/scripts/state.sh"
 source "$SCRIPT_DIR/scripts/status.sh"
 # shellcheck source=ralph-v2/scripts/logs.sh
 source "$SCRIPT_DIR/scripts/logs.sh"
+# shellcheck source=ralph-v2/scripts/prompt.sh
+source "$SCRIPT_DIR/scripts/prompt.sh"
+# shellcheck source=ralph-v2/scripts/metrics.sh
+source "$SCRIPT_DIR/scripts/metrics.sh"
+# shellcheck source=ralph-v2/scripts/agent.sh
+source "$SCRIPT_DIR/scripts/agent.sh"
 
 usage() {
   cat >&2 <<'USAGE'
@@ -31,20 +37,37 @@ is_positive_integer() {
 run_pipeline() {
   local state_file="$1"
   local workspace="$2"
-  local step step_id log_file
+  local step step_id step_type log_file template_file prompt metrics_json agent_status
 
   mkdir -p "$workspace/logs"
 
   while step="$(state_get_current_step "$state_file")"; do
     step_id="$(jq -r '.id' <<<"$step")"
+    step_type="$(jq -r '.type' <<<"$step")"
     log_file="$workspace/logs/$step_id.log"
+    template_file="$SCRIPT_DIR/prompts/$step_type.md"
 
     state_update_step "$state_file" "$step_id" "in_progress"
-    echo "stub step $step_id in_progress" >> "$log_file"
 
-    echo "stub step $step_id completed" >> "$log_file"
-    state_update_step "$state_file" "$step_id" "completed" '{"duration":"0s"}'
+    if ! prompt="$(prompt_render "$template_file" "$state_file" "$workspace" "$step" "$SCRIPT_DIR/skills")"; then
+      state_update_step "$state_file" "$step_id" "failed"
+      return 1
+    fi
+
+    set +e
+    metrics_json="$(agent_run_step "$step" "$prompt" "$log_file")"
+    agent_status=$?
+    set -e
+
+    if [[ "$agent_status" -ne 0 ]]; then
+      state_update_step "$state_file" "$step_id" "failed"
+      return "$agent_status"
+    fi
+
+    state_update_step "$state_file" "$step_id" "completed" "$metrics_json"
   done
+
+  metrics_print_summary "$state_file"
 }
 
 COMMAND="run"

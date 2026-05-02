@@ -13,7 +13,7 @@ status_print() {
         (.value.type // "-"),
         (.value.agent // "-"),
         .value.status,
-        (.value.metrics.duration // "-")
+        (.value.metrics.duration // .value.metrics.duration_ms // "-")
       ]
     | @tsv
   ' "$state_file" | while IFS=$'\t' read -r number id type agent status duration; do

@@ -3,12 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RALPH="$ROOT_DIR/ralph.sh"
+CLEANUP_SCRIPT="$ROOT_DIR/cleanup.sh"
 PROJECT_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 WORKSPACES_DIR="$ROOT_DIR/workspaces"
+ARCHIVE_DIR="$ROOT_DIR/archive"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019 9020 9021)
+TEST_ISSUES=(42 9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019 9020 9021 9022 9023 9024)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -27,8 +29,10 @@ cleanup() {
 
   for issue in "${TEST_ISSUES[@]}"; do
     rm -rf "${WORKSPACES_DIR:?}/$issue"
+    rm -rf "${ARCHIVE_DIR:?}/"*-"$issue"
   done
   rm -rf "${WORKSPACES_DIR:?}/fake-bin"
+  rmdir "$ARCHIVE_DIR" 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -1119,6 +1123,100 @@ test_issue_must_be_positive_integer() {
 
   [[ "$status" -ne 0 ]] || fail "expected invalid issue to fail"
   assert_contains "$output" "--issue must be a positive integer"
+}
+
+test_cleanup_archives_workspace_by_issue_number() {
+  local issue date destination output
+
+  issue="42"
+  date="$(date +%Y-%m-%d)"
+  destination="$ARCHIVE_DIR/$date-$issue"
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$destination"
+  mkdir -p "$WORKSPACES_DIR/$issue"
+  printf "state\n" > "$WORKSPACES_DIR/$issue/state.json"
+
+  output="$("$CLEANUP_SCRIPT" "$issue")"
+
+  [[ ! -d "$WORKSPACES_DIR/$issue" ]] || fail "expected workspace to be moved"
+  [[ -f "$destination/state.json" ]] || fail "expected archived state.json"
+  [[ "$(ls -1 "$WORKSPACES_DIR" | grep -x "$issue" || true)" == "" ]] || fail "workspace still listed"
+  assert_contains "$output" "$WORKSPACES_DIR/$issue"
+  assert_contains "$output" "$destination"
+}
+
+test_cleanup_errors_when_workspace_is_missing() {
+  local issue output status
+
+  issue="9022"
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+
+  set +e
+  output="$("$CLEANUP_SCRIPT" "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected missing workspace cleanup to fail"
+  assert_contains "$output" "workspace not found"
+  assert_contains "$output" "$WORKSPACES_DIR/$issue"
+}
+
+test_cleanup_errors_when_archive_destination_exists() {
+  local issue date destination output status
+
+  issue="9023"
+  date="$(date +%Y-%m-%d)"
+  destination="$ARCHIVE_DIR/$date-$issue"
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$destination"
+  mkdir -p "$WORKSPACES_DIR/$issue" "$destination"
+
+  set +e
+  output="$("$CLEANUP_SCRIPT" "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected existing archive cleanup to fail"
+  [[ -d "$WORKSPACES_DIR/$issue" ]] || fail "expected workspace to remain when archive exists"
+  assert_contains "$output" "archive destination already exists"
+  assert_contains "$output" "$destination"
+}
+
+test_cleanup_validates_issue_number() {
+  local output status
+
+  set +e
+  output="$("$CLEANUP_SCRIPT" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected missing cleanup issue to fail"
+  assert_contains "$output" "issue number is required"
+
+  set +e
+  output="$("$CLEANUP_SCRIPT" "0" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected invalid cleanup issue to fail"
+  assert_contains "$output" "issue number must be a positive integer"
+}
+
+test_cleanup_removes_empty_workspaces_directory() {
+  local issue date destination output
+
+  issue="9024"
+  date="$(date +%Y-%m-%d)"
+  destination="$ARCHIVE_DIR/$date-$issue"
+  rm -rf "$WORKSPACES_DIR" "$destination"
+  mkdir -p "$WORKSPACES_DIR/$issue"
+
+  output="$("$CLEANUP_SCRIPT" "$issue")"
+
+  [[ -d "$destination" ]] || fail "expected archived workspace"
+  [[ ! -d "$WORKSPACES_DIR" ]] || fail "expected empty workspaces directory to be removed"
+  assert_contains "$output" "$WORKSPACES_DIR/$issue"
+  assert_contains "$output" "$destination"
+  mkdir -p "$WORKSPACES_DIR"
+  printf '\n' > "$WORKSPACES_DIR/.gitkeep"
 }
 
 test_run_requires_existing_state() {
@@ -2318,6 +2416,11 @@ test_final_and_pr_review_pipeline_completes_with_idempotent_pr() {
 }
 
 test_issue_must_be_positive_integer
+test_cleanup_archives_workspace_by_issue_number
+test_cleanup_errors_when_workspace_is_missing
+test_cleanup_errors_when_archive_destination_exists
+test_cleanup_validates_issue_number
+test_cleanup_removes_empty_workspaces_directory
 test_run_requires_existing_state
 test_run_rejects_failed_steps
 test_run_hard_stops_when_context_missing

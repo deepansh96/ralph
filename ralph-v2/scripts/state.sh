@@ -82,7 +82,7 @@ state_add_steps() {
 
   if ! jq -e --argjson new_steps "$steps_json" '
     ($new_steps | type) == "array"
-    and all($new_steps[]; (.id | type) == "string" and length > 0)
+    and all($new_steps[]; (.id | type) == "string" and (.id | length) > 0)
   ' "$state_file" >/dev/null; then
     echo "Error: new steps must be a JSON array with non-empty string ids" >&2
     return 1

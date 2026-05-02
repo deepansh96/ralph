@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RALPH="$ROOT_DIR/ralph.sh"
 WORKSPACES_DIR="$ROOT_DIR/workspaces"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011)
 
 cleanup() {
   local issue
@@ -118,6 +118,116 @@ jq -n --arg prompt "$prompt" '{
   },
   total_cost_usd: 0.02
 }'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_interrupt_once_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+marker="$(dirname "$0")/interrupted-once"
+if [[ ! -f "$marker" ]]; then
+  touch "$marker"
+  kill -INT "$PPID"
+  sleep 1
+  exit 130
+fi
+
+jq -n '{
+  result: "completed after interrupt",
+  duration_ms: 100,
+  usage: {
+    input_tokens: 1,
+    output_tokens: 1
+  },
+  total_cost_usd: 0.01
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_hitl_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+workspace="$(awk '/^Workspace / { print $2; exit }' <<<"$prompt")"
+step_id="$(awk '/^Step / { print $2; exit }' <<<"$prompt")"
+state_file="$workspace/state.json"
+flag_file="$workspace/hitl-$step_id.md"
+
+if [[ "$prompt" == *"## HITL Resume"* ]]; then
+  [[ "$prompt" == *"Use the reviewed option"* ]] || exit 41
+  [[ "$prompt" == *"Do not repeat any council or review phase"* ]] || exit 42
+  jq -n --arg prompt "$prompt" '{
+    result: ("resumed with: " + $prompt),
+    duration_ms: 222,
+    usage: {
+      input_tokens: 3,
+      output_tokens: 2
+    },
+    total_cost_usd: 0.03
+  }'
+  exit 0
+fi
+
+jq --arg id "$step_id" '
+  .steps |= map(if .id == $id then .status = "blocked" else . end)
+' "$state_file" > "$state_file.tmp"
+mv "$state_file.tmp" "$state_file"
+
+cat > "$flag_file" <<'FLAG'
+## Questions
+
+Which option should the review continue with?
+
+## Answers
+FLAG
+
+jq -n '{
+  result: "blocked for human input",
+  duration_ms: 111,
+  usage: {
+    input_tokens: 2,
+    output_tokens: 1
+  },
+  total_cost_usd: 0.02
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_failing_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "agent failed deliberately" >&2
+exit 42
 FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
 }
@@ -387,6 +497,132 @@ test_codex_agent_step_logs_jsonl_and_records_metrics() {
   assert_contains "$output" "codex"
 }
 
+test_sigint_resets_running_step_to_pending_and_rerun_picks_it_up() {
+  local issue output fake_bin status first_status second_status
+
+  issue="9009"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_interrupt_once_claude "$fake_bin"
+
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9009-fixture",
+      steps: [
+        {
+          id: "interruptible-step",
+          type: "test-fixture",
+          agent: "claude",
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -eq 0 ]] || fail "expected SIGINT handler to exit cleanly, got $status: $output"
+  first_status="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  [[ "$first_status" == "pending" ]] || fail "expected interrupted step to reset to pending, got $first_status"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+  second_status="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  [[ "$second_status" == "completed" ]] || fail "expected rerun to complete same step, got $second_status"
+}
+
+test_blocked_step_stops_then_resumes_with_human_answers() {
+  local issue output fake_bin flag_file status_value log_file
+
+  issue="9010"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_hitl_claude "$fake_bin"
+
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9010-fixture",
+      steps: [
+        {
+          id: "review-step",
+          type: "test-fixture",
+          agent: "claude",
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue")"
+  flag_file="$WORKSPACES_DIR/$issue/hitl-review-step.md"
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+
+  [[ "$status_value" == "blocked" ]] || fail "expected step to remain blocked, got $status_value"
+  [[ -f "$flag_file" ]] || fail "expected HITL flag file"
+  assert_contains "$output" "blocked for human input"
+  assert_contains "$output" "$flag_file"
+
+  printf "\nUse the reviewed option\n" >> "$flag_file"
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  log_file="$WORKSPACES_DIR/$issue/logs/review-step.log"
+  [[ "$status_value" == "completed" ]] || fail "expected answered HITL step to complete, got $status_value"
+  assert_contains "$(tr '\n' ' ' < "$log_file")" "resumed with"
+}
+
+test_failed_agent_invocation_marks_step_failed_and_exits_one() {
+  local issue output fake_bin status status_value
+
+  issue="9011"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_failing_claude "$fake_bin"
+
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9011-fixture",
+      steps: [
+        {
+          id: "failing-step",
+          type: "test-fixture",
+          agent: "claude",
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -eq 1 ]] || fail "expected failed agent to make ralph exit 1, got $status: $output"
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  [[ "$status_value" == "failed" ]] || fail "expected failed agent step to be marked failed, got $status_value"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -396,5 +632,8 @@ test_logs_tails_active_step_log
 test_logs_tails_specific_step_log
 test_claude_agent_step_renders_prompt_logs_metrics_and_summary
 test_codex_agent_step_logs_jsonl_and_records_metrics
+test_sigint_resets_running_step_to_pending_and_rerun_picks_it_up
+test_blocked_step_stops_then_resumes_with_human_answers
+test_failed_agent_invocation_marks_step_failed_and_exits_one
 
 echo "All ralph-v2 tests passed"

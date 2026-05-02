@@ -29,6 +29,22 @@ state_get_current_step() {
   printf '%s\n' "$step"
 }
 
+state_get_blocked_step() {
+  local state_file="$1"
+  local step
+
+  step="$(jq -c 'first(.steps[]? | select(.status == "blocked")) // empty' "$state_file")"
+  [[ -n "$step" ]] || return 1
+  printf '%s\n' "$step"
+}
+
+state_get_step_status() {
+  local state_file="$1"
+  local step_id="$2"
+
+  jq -r --arg id "$step_id" 'first(.steps[]? | select(.id == $id) | .status) // empty' "$state_file"
+}
+
 state_update_step() {
   local state_file="$1"
   local step_id="$2"

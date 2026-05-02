@@ -8,7 +8,7 @@ WORKSPACES_DIR="$ROOT_DIR/workspaces"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -1069,7 +1069,7 @@ test_claude_agent_step_renders_prompt_logs_metrics_and_summary() {
           type: "test-fixture",
           agent: "claude",
           status: "pending",
-          subIssue: 77,
+          sub_issue: 77,
           metrics: {},
           notes: ""
         }
@@ -1504,6 +1504,140 @@ test_create_slices_prompt_defines_full_slice_creation_contract() {
   assert_contains "$prompt" "duplicates"
 }
 
+test_preflight_prompt_defines_full_preflight_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/preflight.md"
+  [[ -f "$prompt_file" ]] || fail "expected preflight prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "git status --porcelain"
+  assert_contains "$prompt" "working tree"
+  assert_contains "$prompt" "baseBranch"
+  assert_contains "$prompt" "clear guidance"
+  assert_contains "$prompt" "feat/issue-{{ISSUE}}-<slug>"
+  assert_contains "$prompt" "kebab"
+  assert_contains "$prompt" "git push"
+  assert_contains "$prompt" "branch"
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "sub-issues"
+  assert_contains "$prompt" "state_add_steps"
+  assert_contains "$prompt" "implement-slice"
+  assert_contains "$prompt" "final-review"
+  assert_contains "$prompt" "pr-review"
+  assert_contains "$prompt" "codex"
+  assert_contains "$prompt" "sub_issue"
+  assert_contains "$prompt" "idempotent"
+}
+
+test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
+  local issue state_file duplicate_output status ids agents sub_issues output
+
+  issue="9019"
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  state_file="$WORKSPACES_DIR/$issue/state.json"
+
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9019-fixture",
+      steps: [
+        {
+          id: "preflight",
+          phase: "fixed",
+          type: "preflight",
+          agent: "claude",
+          reviewer: null,
+          hitl: false,
+          status: "completed",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$state_file"
+
+  source "$ROOT_DIR/scripts/state.sh"
+
+  state_add_steps "$state_file" '[
+    {
+      "id": "implement-slice-9101",
+      "phase": "dynamic",
+      "type": "implement-slice",
+      "agent": "codex",
+      "reviewer": null,
+      "hitl": false,
+      "status": "pending",
+      "sub_issue": 9101,
+      "metrics": null,
+      "notes": ""
+    },
+    {
+      "id": "implement-slice-9102",
+      "phase": "dynamic",
+      "type": "implement-slice",
+      "agent": "codex",
+      "reviewer": null,
+      "hitl": false,
+      "status": "pending",
+      "sub_issue": 9102,
+      "metrics": null,
+      "notes": ""
+    },
+    {
+      "id": "final-review",
+      "phase": "dynamic",
+      "type": "final-review",
+      "agent": "claude",
+      "reviewer": null,
+      "hitl": false,
+      "status": "pending",
+      "metrics": null,
+      "notes": ""
+    },
+    {
+      "id": "pr-review",
+      "phase": "dynamic",
+      "type": "pr-review",
+      "agent": "claude",
+      "reviewer": null,
+      "hitl": false,
+      "status": "pending",
+      "metrics": null,
+      "notes": ""
+    }
+  ]'
+
+  ids="$(jq -r '.steps[].id' "$state_file" | tr '\n' ' ')"
+  agents="$(jq -r '.steps[] | select(.phase == "dynamic") | "\(.type):\(.agent)"' "$state_file" | tr '\n' ' ')"
+  sub_issues="$(jq -r '.steps[] | select(.type == "implement-slice") | .sub_issue' "$state_file" | tr '\n' ' ')"
+
+  assert_contains "$ids" "preflight implement-slice-9101 implement-slice-9102 final-review pr-review"
+  assert_contains "$agents" "implement-slice:codex"
+  assert_contains "$agents" "final-review:claude"
+  assert_contains "$agents" "pr-review:claude"
+  assert_contains "$sub_issues" "9101 9102"
+
+  output="$("$RALPH" status --issue "$issue")"
+  assert_contains "$output" "implement-slice-9101"
+  assert_contains "$output" "implement-slice-9102"
+  assert_contains "$output" "final-review"
+  assert_contains "$output" "pr-review"
+
+  set +e
+  duplicate_output="$(state_add_steps "$state_file" '[{"id":"implement-slice-9101","phase":"dynamic","type":"implement-slice","agent":"codex","status":"pending"}]' 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected duplicate dynamic step id to fail"
+  assert_contains "$duplicate_output" "duplicate step id"
+  [[ "$(jq '.steps | length' "$state_file")" == "5" ]] || fail "expected duplicate failure not to append steps"
+}
+
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
   local issue fake_bin output flag_file findings_file status_value log_file status
 
@@ -1732,6 +1866,8 @@ test_council_review_handles_timeout_and_cleans_up
 test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
 test_create_prd_prompt_defines_full_prd_workflow_contract
 test_create_slices_prompt_defines_full_slice_creation_contract
+test_preflight_prompt_defines_full_preflight_workflow_contract
+test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes
 test_create_prd_pipeline_preserves_original_and_updates_single_prd_body
 test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently

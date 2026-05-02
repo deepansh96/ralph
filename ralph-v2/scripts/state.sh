@@ -74,3 +74,37 @@ state_update_step() {
 
   mv "$tmp_file" "$state_file"
 }
+
+state_add_steps() {
+  local state_file="$1"
+  local steps_json="$2"
+  local tmp_file
+
+  if ! jq -e --argjson new_steps "$steps_json" '
+    ($new_steps | type) == "array"
+    and all($new_steps[]; (.id | type) == "string" and length > 0)
+  ' "$state_file" >/dev/null; then
+    echo "Error: new steps must be a JSON array with non-empty string ids" >&2
+    return 1
+  fi
+
+  if ! jq -e --argjson new_steps "$steps_json" '
+    ([.steps[]?.id] + [$new_steps[].id]) as $ids
+    | ($ids | length) == ($ids | unique | length)
+  ' "$state_file" >/dev/null; then
+    echo "Error: duplicate step id in state_add_steps input" >&2
+    return 1
+  fi
+
+  tmp_file="$(mktemp "${state_file}.tmp.XXXXXX")"
+
+  if ! jq \
+    --argjson new_steps "$steps_json" \
+    '.steps = ((.steps // []) + $new_steps)' \
+    "$state_file" > "$tmp_file"; then
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  mv "$tmp_file" "$state_file"
+}

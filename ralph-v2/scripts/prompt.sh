@@ -21,7 +21,7 @@ prompt_render() {
   branch="$(jq -r '.branch // ""' "$state_file")"
   base_branch="$(jq -r '.baseBranch // ""' "$state_file")"
   step_id="$(jq -r '.id // ""' <<<"$step_json")"
-  sub_issue="$(jq -r '.subIssue // ""' <<<"$step_json")"
+  sub_issue="$(jq -r '.sub_issue // .subIssue // ""' <<<"$step_json")"
 
   prompt="${prompt//\{\{ISSUE\}\}/$issue}"
   prompt="${prompt//\{\{REPO\}\}/$repo}"

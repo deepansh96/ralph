@@ -8,7 +8,7 @@ WORKSPACES_DIR="$ROOT_DIR/workspaces"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019 9020)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019 9020 9021)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -846,6 +846,158 @@ FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
 }
 
+install_fake_final_and_pr_review_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
+workspace="$(awk '/^Workspace:/ { print $2; exit }' <<<"$prompt")"
+step_id="$(awk '/^Step:/ { print $2; exit }' <<<"$prompt")"
+
+case "$step_id" in
+  final-review)
+    [[ "$prompt" == *"Issue: 9021"* ]] || exit 131
+    [[ "$prompt" == *"Repo: deepansh96/ralph"* ]] || exit 132
+    [[ "$prompt" == *"Branch: feat/issue-9021-final-pr-workflow"* ]] || exit 133
+    [[ "$prompt" == *"Base branch: main"* ]] || exit 134
+    [[ "$prompt" == *"git diff --name-only main...HEAD"* ]] || exit 135
+    [[ "$prompt" == *"Progressively read changed files"* ]] || exit 136
+    [[ "$prompt" == *"Run quality checks from CLAUDE.md"* ]] || exit 137
+    [[ "$prompt" == *"Verify acceptance criteria from each sub-issue"* ]] || exit 138
+    [[ "$prompt" == *"side effects"* ]] || exit 139
+    [[ "$prompt" == *"scope creep"* ]] || exit 140
+    [[ "$prompt" == *"Update CONTEXT.md"* ]] || exit 141
+    [[ "$prompt" == *"Update CLAUDE.md"* ]] || exit 142
+    cat > "$workspace/final-review.md" <<'FINAL_REVIEW'
+# Final Review
+
+## Changed files reviewed
+
+- ralph-v2/prompts/final-review.md
+- ralph-v2/prompts/pr-review.md
+
+## Quality checks
+
+- bash ralph-v2/tests/test_ralph_v2.sh passed
+
+## Acceptance criteria verification
+
+- #9111: satisfied
+
+## Documentation updates
+
+- No durable project documentation changes discovered.
+
+## Findings
+
+- No blockers.
+
+## Outcome
+
+Pass.
+FINAL_REVIEW
+    jq -n '{
+      result: "final review verified changed files, checks, acceptance criteria, and docs",
+      duration_ms: 555,
+      usage: {
+        input_tokens: 8,
+        output_tokens: 7
+      },
+      total_cost_usd: 0.06
+    }'
+    ;;
+  pr-review)
+    [[ "$prompt" == *"gh pr list"* ]] || exit 151
+    [[ "$prompt" == *"gh pr create"* ]] || exit 152
+    [[ "$prompt" == *"--base main"* ]] || exit 153
+    [[ "$prompt" == *"--head feat/issue-9021-final-pr-workflow"* ]] || exit 154
+    [[ "$prompt" == *"summary of changes"* ]] || exit 155
+    [[ "$prompt" == *"linked sub-issues"* ]] || exit 156
+    [[ "$prompt" == *"human QA checklist"* ]] || exit 157
+    [[ "$prompt" == *"code-review:code-review"* ]] || exit 158
+    [[ "$prompt" == *"PR comments"* ]] || exit 159
+    [[ "$prompt" == *"Do not create duplicate PRs"* ]] || exit 160
+    cat > "$workspace/pr-body.md" <<'PR_BODY'
+## Summary
+
+- Added final-review and pr-review prompt workflows.
+
+## Linked Issues
+
+- Closes #9111
+- Parent: #9021
+
+## Final Review
+
+- Pass.
+
+## Human QA Checklist
+
+- [ ] Run the Ralph v2 test suite.
+PR_BODY
+    if [[ ! -f "$workspace/github-pr.md" ]]; then
+      printf '1\n' > "$workspace/github-pr-create-count"
+      printf 'created PR #77\n' > "$workspace/github-pr.md"
+      action="created"
+    else
+      action="updated"
+    fi
+    cat > "$workspace/pr-review.md" <<PR_REVIEW
+# PR Review
+
+- PR: #77 https://github.com/deepansh96/ralph/pull/77
+- Action: $action
+- Linked sub-issues: #9111
+- code-review:code-review invoked and review comments posted.
+PR_REVIEW
+    jq -n --arg action "$action" '{
+      result: ("pr-review " + $action + " PR and invoked code-review:code-review"),
+      duration_ms: 666,
+      usage: {
+        input_tokens: 9,
+        output_tokens: 8
+      },
+      total_cost_usd: 0.07
+    }'
+    ;;
+  *)
+    echo "unexpected step: $step_id" >&2
+    exit 170
+    ;;
+esac
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
 install_fake_council_success() {
   local fake_bin="$1"
 
@@ -1658,6 +1810,63 @@ test_implement_slice_prompt_defines_full_implementation_workflow_contract() {
   assert_contains "$prompt" "gh issue close {{SUB_ISSUE}} --repo {{REPO}}"
 }
 
+test_final_review_prompt_defines_full_review_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/final-review.md"
+  [[ -f "$prompt_file" ]] || fail "expected final-review prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "Issue: {{ISSUE}}"
+  assert_contains "$prompt" "Repo: {{REPO}}"
+  assert_contains "$prompt" "Workspace: {{WORKSPACE}}"
+  assert_contains "$prompt" "Branch: {{BRANCH}}"
+  assert_contains "$prompt" "Base branch: {{BASE_BRANCH}}"
+  assert_contains "$prompt" "Step: {{STEP_ID}}"
+  assert_contains "$prompt" "Skills: {{SKILLS_DIR}}"
+  assert_contains "$prompt" "agent: claude"
+  assert_contains "$prompt" "git diff --name-only {{BASE_BRANCH}}...HEAD"
+  assert_contains "$prompt" "Progressively read changed files"
+  assert_contains "$prompt" "Run quality checks from CLAUDE.md"
+  assert_contains "$prompt" "Verify acceptance criteria from each sub-issue"
+  assert_contains "$prompt" "side effects"
+  assert_contains "$prompt" "missing pieces"
+  assert_contains "$prompt" "scope creep"
+  assert_contains "$prompt" "Update CONTEXT.md"
+  assert_contains "$prompt" "Update CLAUDE.md"
+  assert_contains "$prompt" "{{WORKSPACE}}/final-review.md"
+}
+
+test_pr_review_prompt_defines_full_pr_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/pr-review.md"
+  [[ -f "$prompt_file" ]] || fail "expected pr-review prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "Issue: {{ISSUE}}"
+  assert_contains "$prompt" "Repo: {{REPO}}"
+  assert_contains "$prompt" "Workspace: {{WORKSPACE}}"
+  assert_contains "$prompt" "Branch: {{BRANCH}}"
+  assert_contains "$prompt" "Base branch: {{BASE_BRANCH}}"
+  assert_contains "$prompt" "Step: {{STEP_ID}}"
+  assert_contains "$prompt" "Skills: {{SKILLS_DIR}}"
+  assert_contains "$prompt" "agent: claude"
+  assert_contains "$prompt" "gh pr list"
+  assert_contains "$prompt" "gh pr create"
+  assert_contains "$prompt" "--base {{BASE_BRANCH}}"
+  assert_contains "$prompt" "--head {{BRANCH}}"
+  assert_contains "$prompt" "summary of changes"
+  assert_contains "$prompt" "linked sub-issues"
+  assert_contains "$prompt" "human QA checklist"
+  assert_contains "$prompt" "code-review:code-review"
+  assert_contains "$prompt" "PR comments"
+  assert_contains "$prompt" "idempotent"
+  assert_contains "$prompt" "Do not create duplicate PRs"
+}
+
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
   local issue state_file duplicate_output status ids agents sub_issues output
 
@@ -2020,6 +2229,94 @@ test_implement_slice_pipeline_runs_codex_with_sub_issue_context() {
   assert_contains "$output" "codex"
 }
 
+test_final_and_pr_review_pipeline_completes_with_idempotent_pr() {
+  local issue fake_bin output final_file pr_body_file pr_review_file create_count final_status pr_status pr_status_after_rerun
+
+  issue="9021"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_final_and_pr_review_claude "$fake_bin"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9021-final-pr-workflow",
+      status: "initialized",
+      steps: [
+        {
+          id: "implement-slice-9111",
+          phase: "dynamic",
+          type: "implement-slice",
+          agent: "codex",
+          reviewer: null,
+          hitl: false,
+          status: "completed",
+          sub_issue: 9111,
+          metrics: {},
+          notes: ""
+        },
+        {
+          id: "final-review",
+          phase: "dynamic",
+          type: "final-review",
+          agent: "claude",
+          reviewer: null,
+          hitl: false,
+          status: "pending",
+          metrics: {},
+          notes: ""
+        },
+        {
+          id: "pr-review",
+          phase: "dynamic",
+          type: "pr-review",
+          agent: "claude",
+          reviewer: null,
+          hitl: false,
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue")"
+
+  final_file="$WORKSPACES_DIR/$issue/final-review.md"
+  pr_body_file="$WORKSPACES_DIR/$issue/pr-body.md"
+  pr_review_file="$WORKSPACES_DIR/$issue/pr-review.md"
+  final_status="$(jq -r '.steps[] | select(.id == "final-review") | .status' "$WORKSPACES_DIR/$issue/state.json")"
+  pr_status="$(jq -r '.steps[] | select(.id == "pr-review") | .status' "$WORKSPACES_DIR/$issue/state.json")"
+
+  [[ "$final_status" == "completed" ]] || fail "expected final-review to complete, got $final_status"
+  [[ "$pr_status" == "completed" ]] || fail "expected pr-review to complete, got $pr_status"
+  [[ -f "$final_file" ]] || fail "expected final-review.md to exist"
+  [[ -f "$pr_body_file" ]] || fail "expected PR body file"
+  [[ -f "$pr_review_file" ]] || fail "expected PR review record"
+  assert_contains "$(<"$final_file")" "Acceptance criteria verification"
+  assert_contains "$(<"$pr_body_file")" "## Summary"
+  assert_contains "$(<"$pr_body_file")" "Closes #9111"
+  assert_contains "$(<"$pr_body_file")" "Human QA Checklist"
+  assert_contains "$(<"$pr_review_file")" "code-review:code-review invoked"
+  assert_contains "$output" "final-review"
+  assert_contains "$output" "pr-review"
+
+  jq '(.steps[] | select(.id == "pr-review") | .status) = "pending"' "$WORKSPACES_DIR/$issue/state.json" > "$WORKSPACES_DIR/$issue/state.json.tmp"
+  mv "$WORKSPACES_DIR/$issue/state.json.tmp" "$WORKSPACES_DIR/$issue/state.json"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  pr_status_after_rerun="$(jq -r '.steps[] | select(.id == "pr-review") | .status' "$WORKSPACES_DIR/$issue/state.json")"
+  create_count="$(<"$WORKSPACES_DIR/$issue/github-pr-create-count")"
+  [[ "$pr_status_after_rerun" == "completed" ]] || fail "expected pr-review rerun to complete, got $pr_status_after_rerun"
+  [[ "$create_count" == "1" ]] || fail "expected rerun not to create duplicate PRs, got create count $create_count"
+  assert_contains "$(<"$pr_review_file")" "Action: updated"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -2044,10 +2341,13 @@ test_create_prd_prompt_defines_full_prd_workflow_contract
 test_create_slices_prompt_defines_full_slice_creation_contract
 test_preflight_prompt_defines_full_preflight_workflow_contract
 test_implement_slice_prompt_defines_full_implementation_workflow_contract
+test_final_review_prompt_defines_full_review_workflow_contract
+test_pr_review_prompt_defines_full_pr_workflow_contract
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes
 test_create_prd_pipeline_preserves_original_and_updates_single_prd_body
 test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently
 test_implement_slice_pipeline_runs_codex_with_sub_issue_context
+test_final_and_pr_review_pipeline_completes_with_idempotent_pr
 
 echo "All ralph-v2 tests passed"

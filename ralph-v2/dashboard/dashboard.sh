@@ -91,7 +91,7 @@ aggregate() {
         if any(.steps[]; .status == "failed") then "failed"
         elif any(.steps[]; .status == "blocked") then "blocked"
         elif any(.steps[]; .status == "in_progress") then "in_progress"
-        elif all(.steps[]; .status == "completed") then "completed"
+        elif ((.steps | length) > 0) and all(.steps[]; .status == "completed") then "completed"
         else "pending"
         end;
 
@@ -139,9 +139,7 @@ aggregate() {
 
 serve() {
   local port="8080"
-  local workspaces_dir
-
-  workspaces_dir="$(resolve_workspaces_dir)"
+  local workspaces_dir=""
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -168,6 +166,15 @@ serve() {
         ;;
     esac
   done
+
+  if [[ -z "$workspaces_dir" ]]; then
+    workspaces_dir="${RALPH_WORKSPACES_DIR:-$DEFAULT_WORKSPACES_DIR}"
+  fi
+
+  if [[ ! -d "$workspaces_dir" ]]; then
+    echo "Error: workspaces directory does not exist or is not a directory: $workspaces_dir" >&2
+    return 1
+  fi
 
   command -v python3 >/dev/null 2>&1 || {
     echo "Error: python3 is required for dashboard.sh serve" >&2

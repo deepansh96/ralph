@@ -101,6 +101,7 @@ test_static_file_server_rejects_path_traversal() {
   tmp_dir="$(mktemp -d)"
   port="19082"
   log_file="$tmp_dir/server.log"
+  mkdir -p "$tmp_dir/workspaces"
 
   start_server "$port" "$tmp_dir/workspaces" "$log_file"
   plain_status="$(curl --path-as-is -o /dev/null -s -w "%{http_code}" "http://127.0.0.1:$port/../../etc/passwd")"
@@ -114,21 +115,40 @@ test_static_file_server_rejects_path_traversal() {
 }
 
 test_api_reports_aggregate_failure_as_json() {
-  local tmp_dir port log_file response_body status
+  local tmp_dir port log_file response_body status ws_dir
 
   tmp_dir="$(mktemp -d)"
   port="19083"
   log_file="$tmp_dir/server.log"
   response_body="$tmp_dir/response.json"
-  printf 'not a directory\n' > "$tmp_dir/not-a-directory"
+  ws_dir="$tmp_dir/workspaces"
+  mkdir -p "$ws_dir"
 
-  start_server "$port" "$tmp_dir/not-a-directory" "$log_file"
+  start_server "$port" "$ws_dir" "$log_file"
+  rm -rf "$ws_dir"
   status="$(curl -o "$response_body" -s -w "%{http_code}" "http://127.0.0.1:$port/api/workspaces")"
 
   [[ "$status" == "500" ]] || fail "expected aggregate failure to return HTTP 500; got $status with $(cat "$response_body")"
   assert_jq_equals "$(cat "$response_body")" '.error' "aggregate failed"
 
   cleanup
+  rm -rf "$tmp_dir"
+}
+
+test_serve_validates_workspaces_directory() {
+  local tmp_dir output status
+
+  tmp_dir="$(mktemp -d)"
+  printf 'not a directory\n' > "$tmp_dir/not-a-directory"
+
+  set +e
+  output="$("$DASHBOARD" serve --port 19083 --workspaces-dir "$tmp_dir/not-a-directory" 2>&1)"
+  status="$?"
+  set -e
+
+  [[ "$status" != "0" ]] || fail "expected serve to fail for non-directory path"
+  [[ "$output" == *"workspaces directory does not exist or is not a directory"* ]] || fail "expected directory validation error; got $output"
+
   rm -rf "$tmp_dir"
 }
 
@@ -162,6 +182,8 @@ test_server_validates_jq_at_startup() {
   python_path="$(command -v python3)"
   ln -s "$python_path" "$fake_bin/python3"
 
+  mkdir -p "$tmp_dir/workspaces"
+
   set +e
   output="$(PATH="$fake_bin" /bin/bash "$DASHBOARD" serve --port 19084 --workspaces-dir "$tmp_dir/workspaces" 2>&1)"
   status="$?"
@@ -179,6 +201,7 @@ test_frontend_static_assets_expose_pipeline_table() {
   tmp_dir="$(mktemp -d)"
   port="19085"
   log_file="$tmp_dir/server.log"
+  mkdir -p "$tmp_dir/workspaces"
 
   start_server "$port" "$tmp_dir/workspaces" "$log_file"
   html="$(curl -fsS "http://127.0.0.1:$port/")"
@@ -205,6 +228,7 @@ test_frontend_static_assets_expose_resilient_interactions() {
   tmp_dir="$(mktemp -d)"
   port="19086"
   log_file="$tmp_dir/server.log"
+  mkdir -p "$tmp_dir/workspaces"
 
   start_server "$port" "$tmp_dir/workspaces" "$log_file"
   html="$(curl -fsS "http://127.0.0.1:$port/")"
@@ -224,6 +248,7 @@ test_frontend_static_assets_expose_resilient_interactions() {
 test_api_serves_configured_workspace_data
 test_static_file_server_rejects_path_traversal
 test_api_reports_aggregate_failure_as_json
+test_serve_validates_workspaces_directory
 test_api_surfaces_warnings_for_malformed_workspace_files
 test_server_validates_jq_at_startup
 test_frontend_static_assets_expose_pipeline_table

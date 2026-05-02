@@ -313,6 +313,28 @@ test_workspaces_dir_flag_precedes_environment() {
   rm -rf "$env_dir" "$flag_dir"
 }
 
+test_empty_steps_derives_pending_not_completed() {
+  local tmp_dir output
+
+  tmp_dir="$(mktemp -d)"
+  write_workspace_state "$tmp_dir" 99 '{
+    "issue": 99,
+    "repo": "deepansh96/ralph",
+    "branch": "feat/empty-steps",
+    "createdAt": "2026-05-02T12:00:00Z",
+    "steps": []
+  }'
+
+  output="$(run_aggregate "$tmp_dir")"
+
+  assert_jq_equals "$output" '.workspaces | length' "1"
+  assert_jq_equals "$output" '.workspaces[0].derivedStatus' "pending"
+  assert_jq_equals "$output" '.workspaces[0].currentStep' "null"
+  assert_jq_equals "$output" '.workspaces[0].totalDuration_ms' "0"
+
+  rm -rf "$tmp_dir"
+}
+
 test_zero_workspaces
 test_completed_workspace
 test_mixed_workspaces_are_sorted_and_prioritized
@@ -320,6 +342,7 @@ test_invalid_files_are_skipped_with_warnings
 test_invalid_step_status_is_skipped_with_warning
 test_missing_metrics_produce_zero_duration_and_null_cost
 test_blocked_step_is_current_when_no_failed_step_exists
+test_empty_steps_derives_pending_not_completed
 test_environment_workspaces_dir_is_used_without_flag
 test_workspaces_dir_flag_precedes_environment
 

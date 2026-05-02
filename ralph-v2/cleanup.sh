@@ -27,7 +27,8 @@ is_positive_integer() {
 ISSUE="$1"
 is_positive_integer "$ISSUE" || die "issue number must be a positive integer"
 
-WORKSPACE_DIR="$SCRIPT_DIR/workspaces/$ISSUE"
+WORKSPACES_BASE="${RALPH_V2_WORKSPACES_DIR:-$SCRIPT_DIR/workspaces}"
+WORKSPACE_DIR="$WORKSPACES_BASE/$ISSUE"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 DATE="$(date +%Y-%m-%d)"
 ARCHIVE_DESTINATION="$ARCHIVE_DIR/$DATE-$ISSUE"
@@ -37,7 +38,7 @@ ARCHIVE_DESTINATION="$ARCHIVE_DIR/$DATE-$ISSUE"
 
 mkdir -p "$ARCHIVE_DIR"
 mv "$WORKSPACE_DIR" "$ARCHIVE_DESTINATION"
-rmdir "$SCRIPT_DIR/workspaces" 2>/dev/null || true
+rmdir "$WORKSPACES_BASE" 2>/dev/null || true
 
 printf 'Archived workspace\n'
 printf '  From: %s\n' "$WORKSPACE_DIR"

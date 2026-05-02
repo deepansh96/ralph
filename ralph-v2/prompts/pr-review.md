@@ -13,6 +13,10 @@ Skills: {{SKILLS_DIR}}
 Default agent: claude
 Mode: AFK, no HITL
 
+## Failure Protocol
+
+If any operation fails irrecoverably (checkout, push, PR creation, code review invocation), set this step's status to `failed` in `{{WORKSPACE}}/state.json` with a note explaining the failure, then stop.
+
 ## Goal
 
 Create an idempotent PR from the feature branch to the base branch, write a comprehensive PR description with a summary of changes, linked sub-issues, and a human QA checklist, then invoke the `code-review:code-review` plugin skill so automated review is posted as PR comments.

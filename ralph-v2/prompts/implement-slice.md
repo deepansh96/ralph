@@ -14,6 +14,10 @@ Skills: {{SKILLS_DIR}}
 Default agent: codex
 Mode: AFK, no HITL
 
+## Failure Protocol
+
+If any operation fails irrecoverably (checkout, tests, quality checks), set this step's status to `failed` in `{{WORKSPACE}}/state.json` with a note explaining the failure, then stop.
+
 ## Goal
 
 Read the project context, parent issue, and assigned sub-issue; implement only the assigned sub-issue via TDD on the feature branch; run project quality checks; commit, push, and close the sub-issue after the implementation is verified.

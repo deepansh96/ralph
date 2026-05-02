@@ -13,6 +13,10 @@ Skills: {{SKILLS_DIR}}
 Default agent: claude
 Mode: AFK, no HITL
 
+## Failure Protocol
+
+If any operation fails irrecoverably (checkout, quality checks), set this step's status to `failed` in `{{WORKSPACE}}/state.json` with a note explaining the failure, then stop.
+
 ## Goal
 
 Review all implementation changes on the feature branch, verify every implemented sub-issue's acceptance criteria, run the project quality checks, update project documentation with newly discovered patterns, and write a final review summary.

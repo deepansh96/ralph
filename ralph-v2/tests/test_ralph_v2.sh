@@ -437,7 +437,7 @@ fi
 
 [[ "$prompt" == *"scripts/council-review.sh"* ]] || exit 61
 [[ "$prompt" == *"Major feedback"* ]] || exit 62
-[[ "$prompt" == *"nitpicks"* ]] || exit 63
+[[ "$prompt" == *"nitpick"* ]] || exit 63
 [[ "$prompt" == *"review-decisions.md"* ]] || exit 64
 
 cat > "$findings_file" <<'FINDINGS'
@@ -1201,22 +1201,22 @@ test_cleanup_validates_issue_number() {
 }
 
 test_cleanup_removes_empty_workspaces_directory() {
-  local issue date destination output
+  local issue date destination output test_workspaces
 
   issue="9024"
   date="$(date +%Y-%m-%d)"
   destination="$ARCHIVE_DIR/$date-$issue"
-  rm -rf "$WORKSPACES_DIR" "$destination"
-  mkdir -p "$WORKSPACES_DIR/$issue"
+  test_workspaces="$(mktemp -d "${WORKSPACES_DIR}.isolated.XXXXXX")"
+  rm -rf "$destination"
+  mkdir -p "$test_workspaces/$issue"
+  printf "state\n" > "$test_workspaces/$issue/state.json"
 
-  output="$("$CLEANUP_SCRIPT" "$issue")"
+  output="$(RALPH_V2_WORKSPACES_DIR="$test_workspaces" "$CLEANUP_SCRIPT" "$issue")"
 
   [[ -d "$destination" ]] || fail "expected archived workspace"
-  [[ ! -d "$WORKSPACES_DIR" ]] || fail "expected empty workspaces directory to be removed"
-  assert_contains "$output" "$WORKSPACES_DIR/$issue"
+  [[ ! -d "$test_workspaces" ]] || fail "expected empty workspaces directory to be removed"
+  assert_contains "$output" "$test_workspaces/$issue"
   assert_contains "$output" "$destination"
-  mkdir -p "$WORKSPACES_DIR"
-  printf '\n' > "$WORKSPACES_DIR/.gitkeep"
 }
 
 test_run_requires_existing_state() {
@@ -1783,7 +1783,7 @@ test_review_decisions_prompt_defines_council_filtering_and_hitl_contract() {
   assert_contains "$prompt" "docs/adr"
   assert_contains "$prompt" "scripts/council-review.sh"
   assert_contains "$prompt" "Major feedback"
-  assert_contains "$prompt" "nitpicks"
+  assert_contains "$prompt" "nitpick"
   assert_contains "$prompt" "review-decisions.md"
   assert_contains "$prompt" "hitl-{{STEP_ID}}.md"
   assert_contains "$prompt" "complete WITHOUT re-running council review"

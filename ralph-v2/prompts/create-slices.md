@@ -40,7 +40,9 @@ Run exactly two rounds of independent council review using the standalone wrappe
 Round 1:
 
 ```bash
-./ralph-v2/scripts/council-review.sh "Review the draft vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on horizontal slicing, missing acceptance criteria, dependency problems, test gaps, and conflicts with CONTEXT.md, CLAUDE.md, or ADRs."
+./ralph-v2/scripts/council-review.sh --only {{REVIEWER}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+
+Review the draft vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on horizontal slicing, missing acceptance criteria, dependency problems, test gaps, and conflicts with CONTEXT.md, CLAUDE.md, or ADRs."
 ```
 
 Incorporate the Round 1 feedback into the slice list. Keep major feedback that changes slice boundaries, sequencing, correctness, or testing. Drop nitpicks and style-only comments.
@@ -48,7 +50,9 @@ Incorporate the Round 1 feedback into the slice list. Keep major feedback that c
 Round 2:
 
 ```bash
-./ralph-v2/scripts/council-review.sh "Review the revised vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on remaining blockers, duplicate or overlapping slices, missing AFK criteria, unresolved dependencies, and contradictions introduced while incorporating Round 1 feedback."
+./ralph-v2/scripts/council-review.sh --only {{REVIEWER}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+
+Review the revised vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on remaining blockers, duplicate or overlapping slices, missing AFK criteria, unresolved dependencies, and contradictions introduced while incorporating Round 1 feedback."
 ```
 
 Incorporate the Round 2 feedback into the final slice list using the same filtering rules. Do not run additional review rounds.

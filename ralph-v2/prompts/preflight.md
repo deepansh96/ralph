@@ -23,7 +23,7 @@ Validate that implementation can start from a clean, explicit base branch; creat
 
 ## Hard Stops
 
-Stop with a clear error and do not modify state if any hard stop fails.
+On any hard stop failure, set this step's status to `failed` in `{{WORKSPACE}}/state.json` with a note explaining the failure, then stop. Ralph will detect the `failed` status and halt the pipeline.
 
 1. Verify the working tree is clean:
    `git status --porcelain`

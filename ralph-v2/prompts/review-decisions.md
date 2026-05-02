@@ -25,14 +25,24 @@ On HITL resume:
 2. Update the GitHub issue with the findings and the human answers where useful.
 3. Do not call `scripts/council-review.sh`.
 4. Do not repeat any council or review phase.
-5. Finish normally so Ralph can mark the step completed.
+5. Do not delete the HITL flag file — it serves as an audit trail.
+6. Finish normally so Ralph can mark the step completed.
 
 ## Council Review
 
 For a first run, call the standalone wrapper:
 
 ```bash
-./ralph-v2/scripts/council-review.sh "Review GitHub issue {{ISSUE}} decisions for design gaps, conflicts with CONTEXT.md, conflicts with CLAUDE.md, and conflicts with ADRs. Focus on major product or architecture risks."
+./ralph-v2/scripts/council-review.sh --only {{REVIEWER}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+
+Review the decisions in GitHub issue {{ISSUE}} (repo {{REPO}}). Evaluate each decision against:
+1. DESIGN GAPS — Are any decisions missing that a developer would need before implementation? Are scope boundaries explicit?
+2. ARCHITECTURE RISKS — Could any decision lead to performance, scaling, security, or maintainability problems?
+3. CODEBASE CONFLICTS — Do any decisions contradict patterns in CONTEXT.md, CLAUDE.md, or existing ADRs?
+4. IMPLEMENTATION CLARITY — Is each decision specific enough to implement without guessing? Are acceptance criteria testable?
+5. DEPENDENCY & SEQUENCING — Are there implicit ordering constraints or external dependencies that are not called out?
+6. TESTABILITY — Can the proposed approach be verified with automated tests? Are edge cases addressed?
+For each issue found, state the severity (critical / major / minor), the specific decision it applies to, and a concrete recommendation."
 ```
 
 Use the council feedback as an independent review of the issue's decisions.
@@ -41,38 +51,60 @@ Use the council feedback as an independent review of the issue's decisions.
 
 Keep:
 
-- Major feedback that could change scope, architecture, sequencing, correctness, or operator workflow.
-- Questions that require human judgment.
+- Critical or major feedback that could change scope, architecture, sequencing, correctness, or operator workflow.
+- Questions that require human judgment and cannot be resolved from the codebase alone.
 - Conflicts with `CONTEXT.md`, `CLAUDE.md`, or ADRs.
 
 Drop:
 
-- nitpicks
-- wording preferences that do not change behavior
-- style-only comments
-- speculative future work outside this issue
+- Minor or nitpick-level feedback
+- Wording preferences that do not change behavior
+- Style-only comments
+- Speculative future work outside this issue
 
 ## Output File
 
-Write findings to `{{WORKSPACE}}/review-decisions.md` with this structure:
+Write findings to `{{WORKSPACE}}/review-decisions.md`. For every point (kept or dropped), include the council's original point, your analysis, and your recommendation.
+
+Structure:
 
 ```md
 # Review Decisions
 
 ## Major feedback
 
-- ...
+### 1. <short title>
+
+**Council:** <what the council said>
+
+**Analysis:** <your take — why this matters, how it affects implementation, whether you agree/disagree and why>
+
+**Recommendation:** <concrete action — what should change, or why no change is needed>
+
+### 2. ...
 
 ## Open questions
 
-- ...
+### 1. <short title>
+
+**Council:** <what the council raised>
+
+**Analysis:** <why this can't be resolved from the codebase alone>
+
+**Recommendation:** <what the human should decide and what the tradeoffs are>
+
+### 2. ...
 
 ## Dropped feedback
 
-- ...
-```
+### 1. <short title>
 
-The `Dropped feedback` section may summarize why nitpicks were dropped, but do not preserve long nitpick lists.
+**Council:** <what the council said>
+
+**Why dropped:** <why this is a nitpick, style-only, or out of scope>
+
+### 2. ...
+```
 
 ## Blocking Protocol
 

@@ -73,7 +73,9 @@ Run exactly two rounds of independent council review using the standalone wrappe
 Round 1:
 
 ```bash
-./ralph-v2/scripts/council-review.sh "Review the draft PRD for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on missing requirements, unclear decisions, architecture risks, testing gaps, and conflicts with CONTEXT.md, CLAUDE.md, or ADRs."
+./ralph-v2/scripts/council-review.sh --only {{REVIEWER}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+
+Review the draft PRD for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on missing requirements, unclear decisions, architecture risks, testing gaps, and conflicts with CONTEXT.md, CLAUDE.md, or ADRs."
 ```
 
 Incorporate the Round 1 feedback into the PRD. Keep major feedback that changes scope, architecture, correctness, sequencing, or testing. Drop nitpicks and style-only comments.
@@ -81,7 +83,9 @@ Incorporate the Round 1 feedback into the PRD. Keep major feedback that changes 
 Round 2:
 
 ```bash
-./ralph-v2/scripts/council-review.sh "Review the revised PRD for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on remaining blockers, unresolved ambiguities, acceptance-risk gaps, and contradictions introduced while incorporating Round 1 feedback."
+./ralph-v2/scripts/council-review.sh --only {{REVIEWER}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+
+Review the revised PRD for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on remaining blockers, unresolved ambiguities, acceptance-risk gaps, and contradictions introduced while incorporating Round 1 feedback."
 ```
 
 Incorporate the Round 2 feedback into the final PRD using the same filtering rules. Do not run additional review rounds.

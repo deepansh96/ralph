@@ -21,7 +21,7 @@ source "$SCRIPT_DIR/scripts/agent.sh"
 usage() {
   cat >&2 <<'USAGE'
 Usage:
-  ralph.sh --issue N
+  ralph.sh --issue N [--steps N]
   ralph.sh status --issue N
   ralph.sh logs --issue N [--step step-id]
 USAGE
@@ -111,8 +111,10 @@ EOF
 run_pipeline() {
   local state_file="$1"
   local workspace="$2"
+  local step_limit="${3:-0}"
   local step step_id step_type log_file template_file prompt metrics_json agent_status metrics_file current_status
   local is_hitl_resume flag_file answers
+  local steps_run=0
 
   mkdir -p "$workspace/logs"
 
@@ -172,6 +174,10 @@ run_pipeline() {
     fi
 
     current_status="$(state_get_step_status "$state_file" "$step_id")"
+    if [[ "$current_status" == "failed" ]]; then
+      state_update_step "$state_file" "$step_id" "failed" "$metrics_json"
+      return 1
+    fi
     if [[ "$current_status" == "blocked" ]]; then
       state_update_step "$state_file" "$step_id" "blocked" "$metrics_json"
       hitl_print_blocked "$step_id" "$(hitl_flag_file "$workspace" "$step_id")"
@@ -179,6 +185,12 @@ run_pipeline() {
     fi
 
     state_update_step "$state_file" "$step_id" "completed" "$metrics_json"
+
+    (( ++steps_run ))
+    if [[ "$step_limit" -gt 0 && "$steps_run" -ge "$step_limit" ]]; then
+      printf "Step limit reached (%d/%d). Stopping.\n" "$steps_run" "$step_limit"
+      return 0
+    fi
   done
 
   metrics_print_summary "$state_file"
@@ -187,6 +199,7 @@ run_pipeline() {
 COMMAND="run"
 ISSUE=""
 STEP_ID=""
+STEP_LIMIT=""
 
 if [[ "${1:-}" == "status" || "${1:-}" == "logs" ]]; then
   COMMAND="$1"
@@ -205,6 +218,11 @@ while [[ $# -gt 0 ]]; do
       STEP_ID="$2"
       shift 2
       ;;
+    --steps)
+      [[ $# -ge 2 ]] || die "--steps requires a value"
+      STEP_LIMIT="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -221,10 +239,15 @@ is_positive_integer "$ISSUE" || die "--issue must be a positive integer"
 
 case "$COMMAND" in
   run)
+    if [[ -n "$STEP_LIMIT" ]]; then
+      is_positive_integer "$STEP_LIMIT" || die "--steps must be a positive integer"
+    fi
     STATE_FILE="$SCRIPT_DIR/workspaces/$ISSUE/state.json"
     state_validate "$STATE_FILE"
-    context_check "$SCRIPT_DIR" "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE"
-    run_pipeline "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE"
+    if ! jq -e '.steps[]? | select(.status == "completed")' "$STATE_FILE" >/dev/null 2>&1; then
+      context_check "$SCRIPT_DIR" "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE"
+    fi
+    run_pipeline "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE" "${STEP_LIMIT:-0}"
     ;;
   status|logs)
     STATE_FILE="$SCRIPT_DIR/workspaces/$ISSUE/state.json"

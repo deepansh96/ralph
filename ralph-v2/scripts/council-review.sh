@@ -24,14 +24,33 @@ council_cleanup_run() {
 command -v council >/dev/null 2>&1 || die "council CLI is required"
 command -v jq >/dev/null 2>&1 || die "jq is required"
 
-PROMPT="$(read_prompt "$@")"
+ONLY=""
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --only)
+      [[ $# -ge 2 ]] || die "--only requires a value"
+      ONLY="$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+PROMPT="$(read_prompt "${ARGS[@]+"${ARGS[@]}"}")"
 [[ -n "${PROMPT//[[:space:]]/}" ]] || die "review prompt is required via argument or stdin"
 
 WORK_DIR="${RALPH_COUNCIL_DIR:-$(pwd)}"
 TIMEOUT_SECONDS="${RALPH_COUNCIL_TIMEOUT_SECONDS:-1800}"
 POLL_INTERVAL="${RALPH_COUNCIL_POLL_INTERVAL:-5}"
 
-ASK_JSON="$(printf '%s' "$PROMPT" | council ask --dir "$WORK_DIR" --json)" || die "council ask failed"
+ASK_CMD=(council ask --dir "$WORK_DIR" --json)
+[[ -z "$ONLY" ]] || ASK_CMD+=(--only "$ONLY")
+
+ASK_JSON="$(printf '%s' "$PROMPT" | "${ASK_CMD[@]}")" || die "council ask failed"
 RUN_ID="$(jq -r '.runId // .run_id // empty' <<<"$ASK_JSON")"
 [[ -n "$RUN_ID" ]] || die "council ask did not return a run id"
 

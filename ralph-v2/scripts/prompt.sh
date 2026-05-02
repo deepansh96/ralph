@@ -15,13 +15,14 @@ prompt_render() {
 
   prompt="$(<"$template_file")"
 
-  local issue repo branch base_branch step_id sub_issue
+  local issue repo branch base_branch step_id sub_issue reviewer
   issue="$(jq -r '.issue // ""' "$state_file")"
   repo="$(jq -r '.repo // ""' "$state_file")"
   branch="$(jq -r '.branch // ""' "$state_file")"
   base_branch="$(jq -r '.baseBranch // ""' "$state_file")"
   step_id="$(jq -r '.id // ""' <<<"$step_json")"
   sub_issue="$(jq -r '.sub_issue // .subIssue // ""' <<<"$step_json")"
+  reviewer="$(jq -r '.reviewer // ""' <<<"$step_json")"
 
   prompt="${prompt//\{\{ISSUE\}\}/$issue}"
   prompt="${prompt//\{\{REPO\}\}/$repo}"
@@ -31,6 +32,7 @@ prompt_render() {
   prompt="${prompt//\{\{STEP_ID\}\}/$step_id}"
   prompt="${prompt//\{\{SUB_ISSUE\}\}/$sub_issue}"
   prompt="${prompt//\{\{SKILLS_DIR\}\}/$skills_dir}"
+  prompt="${prompt//\{\{REVIEWER\}\}/$reviewer}"
 
   printf '%s\n' "$prompt"
 }

@@ -12,14 +12,42 @@
         <h1>Pipeline Dashboard</h1>
         <button id="refresh-button" type="button">Refresh</button>
       </header>
+      <section id="dashboard-error" class="error-message" aria-live="polite" hidden></section>
+      <section id="warnings-banner" class="warnings-banner" aria-live="polite" hidden></section>
       <section id="dashboard-content" aria-live="polite"></section>
     </main>
     <script>
       async function loadPipelines() {
         const content = document.getElementById('dashboard-content');
+        clearError();
+        renderWarnings([]);
         content.textContent = 'Loading Pipelines...';
-        const response = await fetch('/api/workspaces');
-        const data = await response.json();
+
+        let response;
+        try {
+          response = await fetch('/api/workspaces');
+        } catch (error) {
+          showError(`Unable to connect to the dashboard server. ${error.message}`);
+          content.textContent = '';
+          return;
+        }
+
+        if (!response.ok) {
+          showError(`Unable to load Pipeline data. Server returned HTTP ${response.status}.`);
+          content.textContent = '';
+          return;
+        }
+
+        let data;
+        try {
+          data = await response.json();
+        } catch (error) {
+          showError('Unable to parse Pipeline data. The server returned invalid JSON.');
+          content.textContent = '';
+          return;
+        }
+
+        renderWarnings(data.warnings || []);
 
         if (!data.workspaces || data.workspaces.length === 0) {
           content.innerHTML = '<p class="empty-state">No active Pipelines found.</p>';
@@ -31,6 +59,11 @@
         data.workspaces.forEach((workspace) => {
           const row = document.createElement('tr');
           const status = workspace.derivedStatus || 'pending';
+          row.className = 'pipeline-row';
+          row.setAttribute('data-pipeline-row', String(workspace.issue));
+          row.setAttribute('role', 'button');
+          row.setAttribute('tabindex', '0');
+          row.setAttribute('aria-expanded', 'false');
           row.innerHTML = `
             <td>${escapeHtml(workspace.issue)}</td>
             <td>${escapeHtml(workspace.repo)}</td>
@@ -41,8 +74,98 @@
             <td>${formatDuration(workspace.totalDuration_ms || 0)}</td>
             <td>${formatCost(workspace.totalCost_usd)}</td>
           `;
+          row.addEventListener('click', () => togglePipelineDetails(row, workspace));
+          row.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              togglePipelineDetails(row, workspace);
+            }
+          });
           tbody.appendChild(row);
         });
+      }
+
+      function renderWarnings(warnings) {
+        const banner = document.getElementById('warnings-banner');
+        if (!warnings.length) {
+          banner.hidden = true;
+          banner.innerHTML = '';
+          return;
+        }
+
+        banner.hidden = false;
+        banner.innerHTML = `
+          <h2>Workspace Warnings</h2>
+          <ul></ul>
+        `;
+        const list = banner.querySelector('ul');
+        warnings.forEach((warning) => {
+          const item = document.createElement('li');
+          item.textContent = warning;
+          list.appendChild(item);
+        });
+      }
+
+      function showError(message) {
+        const error = document.getElementById('dashboard-error');
+        error.textContent = message;
+        error.hidden = false;
+      }
+
+      function clearError() {
+        const error = document.getElementById('dashboard-error');
+        error.textContent = '';
+        error.hidden = true;
+      }
+
+      function togglePipelineDetails(row, workspace) {
+        const nextRow = row.nextElementSibling;
+        if (nextRow && nextRow.classList.contains('pipeline-details-row')) {
+          nextRow.remove();
+          row.setAttribute('aria-expanded', 'false');
+          return;
+        }
+
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'pipeline-details-row';
+        detailRow.innerHTML = `<td colspan="8">${renderStepDetails(workspace.steps || [])}</td>`;
+        row.after(detailRow);
+        row.setAttribute('aria-expanded', 'true');
+      }
+
+      function renderStepDetails(steps) {
+        if (!steps.length) {
+          return '<p class="empty-details">No Steps recorded.</p>';
+        }
+
+        return `
+          <div class="step-details">
+            <table>
+              <thead>
+                <tr>
+                  <th>Step ID</th>
+                  <th>Type</th>
+                  <th>Agent</th>
+                  <th>Status</th>
+                  <th>Duration</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${steps.map((step) => `
+                  <tr>
+                    <td>${escapeHtml(step.id || 'n/a')}</td>
+                    <td>${escapeHtml(step.type || 'n/a')}</td>
+                    <td>${escapeHtml(step.agent || 'n/a')}</td>
+                    <td><span class="status status-${step.status || 'pending'}">${escapeHtml(step.status || 'pending')}</span></td>
+                    <td>${formatDuration(step.duration_ms || 0)}</td>
+                    <td>${formatCost(step.cost_usd)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
       }
 
       function renderStepProgress(steps) {

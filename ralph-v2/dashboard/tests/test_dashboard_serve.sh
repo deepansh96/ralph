@@ -132,6 +132,27 @@ test_api_reports_aggregate_failure_as_json() {
   rm -rf "$tmp_dir"
 }
 
+test_api_surfaces_warnings_for_malformed_workspace_files() {
+  local tmp_dir port log_file response
+
+  tmp_dir="$(mktemp -d)"
+  port="19084"
+  log_file="$tmp_dir/server.log"
+  write_workspace_state "$tmp_dir/workspaces" 21
+  mkdir -p "$tmp_dir/workspaces/broken"
+  printf '{not-json' > "$tmp_dir/workspaces/broken/state.json"
+
+  start_server "$port" "$tmp_dir/workspaces" "$log_file"
+  response="$(curl -fsS "http://127.0.0.1:$port/api/workspaces")"
+
+  assert_jq_equals "$response" '.workspaces | length' "1"
+  assert_jq_equals "$response" '.warnings | length' "1"
+  [[ "$response" == *"broken/state.json: invalid JSON"* ]] || fail "expected malformed workspace warning"
+
+  cleanup
+  rm -rf "$tmp_dir"
+}
+
 test_server_validates_jq_at_startup() {
   local tmp_dir fake_bin python_path output status
 
@@ -178,10 +199,34 @@ test_frontend_static_assets_expose_pipeline_table() {
   rm -rf "$tmp_dir"
 }
 
+test_frontend_static_assets_expose_resilient_interactions() {
+  local tmp_dir port log_file html
+
+  tmp_dir="$(mktemp -d)"
+  port="19086"
+  log_file="$tmp_dir/server.log"
+
+  start_server "$port" "$tmp_dir/workspaces" "$log_file"
+  html="$(curl -fsS "http://127.0.0.1:$port/")"
+
+  [[ "$html" == *"id=\"warnings-banner\""* ]] || fail "expected warnings banner container"
+  [[ "$html" == *"id=\"dashboard-error\""* ]] || fail "expected inline error container"
+  [[ "$html" == *"data-pipeline-row"* ]] || fail "expected expandable Pipeline rows"
+  [[ "$html" == *"togglePipelineDetails"* ]] || fail "expected row expansion handler"
+  [[ "$html" == *"renderStepDetails"* ]] || fail "expected Step detail renderer"
+  [[ "$html" == *"response.status"* ]] || fail "expected non-2xx HTTP status handling"
+  [[ "$html" == *"warnings.forEach"* ]] || fail "expected warning list rendering"
+
+  cleanup
+  rm -rf "$tmp_dir"
+}
+
 test_api_serves_configured_workspace_data
 test_static_file_server_rejects_path_traversal
 test_api_reports_aggregate_failure_as_json
+test_api_surfaces_warnings_for_malformed_workspace_files
 test_server_validates_jq_at_startup
 test_frontend_static_assets_expose_pipeline_table
+test_frontend_static_assets_expose_resilient_interactions
 
 echo "dashboard serve tests passed"

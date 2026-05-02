@@ -37,6 +37,40 @@ button {
   padding: 8px 14px;
 }
 
+.error-message,
+.warnings-banner {
+  border: 1px solid;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.error-message {
+  background: #ffebe9;
+  border-color: #ff8182;
+  color: #82071e;
+}
+
+.warnings-banner {
+  background: #fff8c5;
+  border-color: #eac54f;
+  color: #7d4e00;
+}
+
+.warnings-banner h2 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.warnings-banner ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.warnings-banner li + li {
+  margin-top: 4px;
+}
+
 table {
   background: #ffffff;
   border: 1px solid #d0d7de;
@@ -56,6 +90,34 @@ th {
   background: #f6f8fa;
   font-size: 13px;
   font-weight: 650;
+}
+
+.pipeline-row {
+  cursor: pointer;
+}
+
+.pipeline-row:hover,
+.pipeline-row:focus {
+  background: #f6f8fa;
+  outline: none;
+}
+
+.pipeline-details-row td {
+  background: #fbfcfd;
+  padding: 0;
+}
+
+.step-details {
+  padding: 12px;
+}
+
+.step-details table {
+  border: 1px solid #d0d7de;
+}
+
+.empty-details {
+  margin: 0;
+  padding: 12px;
 }
 
 .status {

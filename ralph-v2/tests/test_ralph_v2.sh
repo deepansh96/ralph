@@ -8,7 +8,7 @@ WORKSPACES_DIR="$ROOT_DIR/workspaces"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -469,6 +469,107 @@ jq -n '{
     output_tokens: 1
   },
   total_cost_usd: 0.02
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_create_prd_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
+workspace="$(awk '/^Workspace:/ { print $2; exit }' <<<"$prompt")"
+original_file="$workspace/original-issue.md"
+issue_body_file="$workspace/github-issue-body.md"
+
+[[ "$prompt" == *"gh issue view"* ]] || exit 71
+[[ "$prompt" == *"--repo"* ]] || exit 70
+[[ "$prompt" == *"CONTEXT.md"* ]] || exit 72
+[[ "$prompt" == *"CLAUDE.md"* ]] || exit 73
+[[ "$prompt" == *"docs/adr"* ]] || exit 74
+[[ "$prompt" == *"Explore the codebase"* ]] || exit 75
+[[ "$prompt" == *"to-prd"* ]] || exit 76
+[[ "$prompt" == *"Round 1"* ]] || exit 77
+[[ "$prompt" == *"Round 2"* ]] || exit 78
+[[ "$prompt" == *"gh issue edit"* ]] || exit 79
+[[ "$prompt" == *"Do not append a second PRD"* ]] || exit 80
+
+if [[ ! -f "$original_file" ]]; then
+  printf 'Original grilled issue body\n' > "$original_file"
+fi
+
+cat > "$issue_body_file" <<'PRD'
+## Decision Summary
+
+- Workflow: create-prd preserves original issue body and updates the issue with one PRD.
+
+## Problem Statement
+
+The pipeline needs a PRD before slice planning can begin.
+
+## Solution
+
+Create a reviewed PRD from the grilled issue decisions.
+
+## User Stories
+
+1. As a developer, I want the create-prd step to update the existing issue, so that the issue remains the source of truth.
+
+## Implementation Decisions
+
+- Prompt-driven workflow: The agent performs issue reading, review, preservation, and update.
+
+## Testing Decisions
+
+- Test through the Ralph pipeline and prompt contract.
+
+## Out of Scope
+
+- Slice creation and preflight.
+
+## Further Notes
+
+- Re-runs replace this body instead of appending another PRD.
+PRD
+
+jq -n '{
+  result: "create-prd preserved original and updated issue body",
+  duration_ms: 333,
+  usage: {
+    input_tokens: 5,
+    output_tokens: 4
+  },
+  total_cost_usd: 0.04
 }'
 FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
@@ -1267,6 +1368,35 @@ test_review_decisions_prompt_defines_council_filtering_and_hitl_contract() {
   assert_contains "$prompt" "complete WITHOUT re-running council review"
 }
 
+test_create_prd_prompt_defines_full_prd_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/create-prd.md"
+  [[ -f "$prompt_file" ]] || fail "expected create-prd prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "original-issue.md"
+  assert_contains "$prompt" "CONTEXT.md"
+  assert_contains "$prompt" "CLAUDE.md"
+  assert_contains "$prompt" "docs/adr"
+  assert_contains "$prompt" "Explore the codebase"
+  assert_contains "$prompt" "to-prd"
+  assert_contains "$prompt" "Decision Summary"
+  assert_contains "$prompt" "Problem Statement"
+  assert_contains "$prompt" "User Stories"
+  assert_contains "$prompt" "Implementation Decisions"
+  assert_contains "$prompt" "Testing Decisions"
+  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "Round 1"
+  assert_contains "$prompt" "Round 2"
+  assert_contains "$prompt" "incorporate"
+  assert_contains "$prompt" "Compact"
+  assert_contains "$prompt" "gh issue edit {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "idempotent"
+}
+
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
   local issue fake_bin output flag_file findings_file status_value log_file status
 
@@ -1325,6 +1455,77 @@ test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
   assert_contains "$(tr '\n' ' ' < "$log_file")" "completed without rerunning council"
 }
 
+test_create_prd_pipeline_preserves_original_and_updates_single_prd_body() {
+  local issue fake_bin original_file issue_body_file status_value log_file decision_count problem_count
+
+  issue="9016"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_create_prd_claude "$fake_bin"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: null,
+      branch: null,
+      status: "initialized",
+      steps: [
+        {
+          id: "review-decisions",
+          phase: "fixed",
+          type: "review-decisions",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: true,
+          status: "completed",
+          metrics: {},
+          notes: ""
+        },
+        {
+          id: "create-prd",
+          phase: "fixed",
+          type: "create-prd",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: false,
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  original_file="$WORKSPACES_DIR/$issue/original-issue.md"
+  issue_body_file="$WORKSPACES_DIR/$issue/github-issue-body.md"
+  log_file="$WORKSPACES_DIR/$issue/logs/create-prd.log"
+  status_value="$(jq -r '.steps[1].status' "$WORKSPACES_DIR/$issue/state.json")"
+
+  [[ "$status_value" == "completed" ]] || fail "expected create-prd to complete, got $status_value"
+  [[ -f "$original_file" ]] || fail "expected original issue body to be preserved"
+  [[ -f "$issue_body_file" ]] || fail "expected issue body fixture to be updated"
+  assert_contains "$(<"$original_file")" "Original grilled issue body"
+  assert_contains "$(<"$issue_body_file")" "## Decision Summary"
+  assert_contains "$(<"$issue_body_file")" "## Problem Statement"
+  assert_contains "$(tr '\n' ' ' < "$log_file")" "create-prd preserved original"
+
+  jq '.steps[1].status = "pending"' "$WORKSPACES_DIR/$issue/state.json" > "$WORKSPACES_DIR/$issue/state.json.tmp"
+  mv "$WORKSPACES_DIR/$issue/state.json.tmp" "$WORKSPACES_DIR/$issue/state.json"
+  printf 'Original grilled issue body\nHuman note that must stay preserved\n' > "$original_file"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  assert_contains "$(<"$original_file")" "Human note that must stay preserved"
+  decision_count="$(grep -c '^## Decision Summary$' "$issue_body_file")"
+  problem_count="$(grep -c '^## Problem Statement$' "$issue_body_file")"
+  [[ "$decision_count" == "1" ]] || fail "expected one Decision Summary after rerun, got $decision_count"
+  [[ "$problem_count" == "1" ]] || fail "expected one Problem Statement after rerun, got $problem_count"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -1345,6 +1546,8 @@ test_council_review_submits_polls_reads_cleans_up_and_prints_review
 test_council_review_handles_member_failure_and_cleans_up
 test_council_review_handles_timeout_and_cleans_up
 test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
+test_create_prd_prompt_defines_full_prd_workflow_contract
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes
+test_create_prd_pipeline_preserves_original_and_updates_single_prd_body
 
 echo "All ralph-v2 tests passed"

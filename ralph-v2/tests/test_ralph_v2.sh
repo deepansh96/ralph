@@ -3,11 +3,27 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RALPH="$ROOT_DIR/ralph.sh"
+PROJECT_ROOT="$(cd "$ROOT_DIR/.." && pwd)"
 WORKSPACES_DIR="$ROOT_DIR/workspaces"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012)
+CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
+INITIAL_CONTEXT_BACKUP="$(mktemp)"
+INITIAL_CONTEXT_PRESENT="false"
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015)
+
+if [[ -f "$CONTEXT_FILE" ]]; then
+  cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
+  INITIAL_CONTEXT_PRESENT="true"
+fi
 
 cleanup() {
   local issue
+
+  if [[ "$INITIAL_CONTEXT_PRESENT" == "true" ]]; then
+    cp "$INITIAL_CONTEXT_BACKUP" "$CONTEXT_FILE"
+  else
+    rm -f "$CONTEXT_FILE"
+  fi
+  rm -f "$INITIAL_CONTEXT_BACKUP"
 
   for issue in "${TEST_ISSUES[@]}"; do
     rm -rf "${WORKSPACES_DIR:?}/$issue"
@@ -28,6 +44,57 @@ assert_contains() {
   local needle="$2"
 
   [[ "$haystack" == *"$needle"* ]] || fail "expected output to contain: $needle"$'\n'"actual: $haystack"
+}
+
+backup_context_once() {
+  mkdir -p "$WORKSPACES_DIR"
+}
+
+remove_context() {
+  backup_context_once
+  rm -f "$CONTEXT_FILE"
+}
+
+write_valid_context() {
+  backup_context_once
+  cat > "$CONTEXT_FILE" <<'CONTEXT'
+# Ralph
+
+Ralph is an autonomous coding agent orchestrator.
+
+## Language
+
+**Pipeline**:
+An ordered set of steps Ralph runs for one GitHub issue.
+_Avoid_: Loop
+
+**Step**:
+A resumable unit of pipeline work tracked in state.json.
+_Avoid_: Iteration
+
+## Relationships
+
+- A **Pipeline** contains one or more **Steps**
+- A **Step** belongs to exactly one **Pipeline**
+
+## Example dialogue
+
+> **Dev:** "Can I restart the **Pipeline** after a failed **Step**?"
+> **Domain expert:** "Yes, reset the **Step** status and rerun Ralph."
+
+## Flagged ambiguities
+
+- "iteration" means the v1 loop; v2 uses **Step**.
+CONTEXT
+}
+
+write_insufficient_context() {
+  backup_context_once
+  cat > "$CONTEXT_FILE" <<'CONTEXT'
+# Ralph
+
+Intentionally incomplete fixture.
+CONTEXT
 }
 
 write_single_step_state() {
@@ -110,7 +177,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 jq -n --arg prompt "$prompt" '{
-  result: ("claude saw: " + $prompt),
+  result: (
+    if ($prompt | contains("CONTEXT_CHECK_REQUIRED")) then
+      "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format."
+    else
+      "claude saw: " + $prompt
+    end
+  ),
   duration_ms: 1234,
   usage: {
     input_tokens: 11,
@@ -118,6 +191,52 @@ jq -n --arg prompt "$prompt" '{
   },
   total_cost_usd: 0.02
 }'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_context_check_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"Intentionally incomplete fixture"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: FAIL\nMissing required sections: Language, Relationships, Example dialogue, Flagged ambiguities.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+else
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+fi
 FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
 }
@@ -131,6 +250,32 @@ install_fake_interrupt_once_claude() {
 set -euo pipefail
 
 marker="$(dirname "$0")/interrupted-once"
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
 if [[ ! -f "$marker" ]]; then
   touch "$marker"
   kill -INT "$PPID"
@@ -172,12 +317,25 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
 workspace="$(awk '/^Workspace / { print $2; exit }' <<<"$prompt")"
 step_id="$(awk '/^Step / { print $2; exit }' <<<"$prompt")"
 state_file="$workspace/state.json"
 flag_file="$workspace/hitl-$step_id.md"
 
-if [[ "$prompt" == *"## HITL Resume"* ]]; then
+if [[ "$prompt" == *"This step was previously blocked for human input"* ]]; then
   [[ "$prompt" == *"Use the reviewed option"* ]] || exit 41
   [[ "$prompt" == *"Do not repeat any council or review phase"* ]] || exit 42
   jq -n --arg prompt "$prompt" '{
@@ -218,13 +376,137 @@ FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
 }
 
-install_fake_failing_claude() {
+install_fake_review_decisions_claude() {
   local fake_bin="$1"
 
   mkdir -p "$fake_bin"
   cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
 #!/usr/bin/env bash
 set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
+workspace="$(awk '/^Workspace:/ { print $2; exit }' <<<"$prompt")"
+step_id="$(awk '/^Step:/ { print $2; exit }' <<<"$prompt")"
+state_file="$workspace/state.json"
+flag_file="$workspace/hitl-$step_id.md"
+findings_file="$workspace/review-decisions.md"
+
+if [[ "$prompt" == *"This step was previously blocked for human input"* ]]; then
+  [[ "$prompt" == *"complete WITHOUT re-running council review"* ]] || exit 51
+  [[ "$prompt" == *"Use the architecture option"* ]] || exit 52
+  jq -n --arg prompt "$prompt" '{
+    result: ("completed without rerunning council: " + $prompt),
+    duration_ms: 222,
+    usage: {
+      input_tokens: 3,
+      output_tokens: 2
+    },
+    total_cost_usd: 0.03
+  }'
+  exit 0
+fi
+
+[[ "$prompt" == *"scripts/council-review.sh"* ]] || exit 61
+[[ "$prompt" == *"Major feedback"* ]] || exit 62
+[[ "$prompt" == *"nitpicks"* ]] || exit 63
+[[ "$prompt" == *"review-decisions.md"* ]] || exit 64
+
+cat > "$findings_file" <<'FINDINGS'
+# Review Decisions
+
+## Major feedback
+
+- Major issue: baseBranch must be explicit before preflight.
+
+## Open questions
+
+- Which architecture option should Ralph use?
+FINDINGS
+
+jq --arg id "$step_id" '
+  .steps |= map(if .id == $id then .status = "blocked" else . end)
+' "$state_file" > "$state_file.tmp"
+mv "$state_file.tmp" "$state_file"
+
+cat > "$flag_file" <<'FLAG'
+## Questions
+
+Which architecture option should Ralph use?
+
+## Answers
+FLAG
+
+jq -n '{
+  result: "blocked after review-decisions council feedback",
+  duration_ms: 111,
+  usage: {
+    input_tokens: 2,
+    output_tokens: 1
+  },
+  total_cost_usd: 0.02
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_failing_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
 
 echo "agent failed deliberately" >&2
 exit 42
@@ -261,6 +543,146 @@ fi
 printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":13,"output_tokens":8}}'
 FAKE_CODEX
   chmod +x "$fake_bin/codex"
+
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+jq -n '{
+  result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+  duration_ms: 100,
+  usage: {
+    input_tokens: 1,
+    output_tokens: 1
+  },
+  total_cost_usd: 0.01
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_council_success() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/council" <<'FAKE_COUNCIL'
+#!/usr/bin/env bash
+set -euo pipefail
+
+calls_file="$(dirname "$0")/council-calls"
+status_file="$(dirname "$0")/council-status-count"
+command_name="${1:-}"
+shift || true
+printf '%s %s\n' "$command_name" "$*" >> "$calls_file"
+
+case "$command_name" in
+  ask)
+    cat >/dev/null
+    printf '%s\n' '{"runId":"run-123","members":["codex"],"dataDir":".council/run-123"}'
+    ;;
+  status)
+    count=0
+    [[ -f "$status_file" ]] && count="$(<"$status_file")"
+    count=$((count + 1))
+    printf '%s' "$count" > "$status_file"
+    if [[ "$count" -lt 2 ]]; then
+      printf '%s\n' '{"run_id":"run-123","running":true,"members":{"codex":{"status":"working","bytes":0,"elapsed_seconds":1}}}'
+    else
+      printf '%s\n' '{"run_id":"run-123","running":false,"members":{"codex":{"status":"done","exit_code":0,"bytes":10,"elapsed_seconds":2}}}'
+    fi
+    ;;
+  read)
+    printf '%s\n' '{"run_id":"run-123","members":{"codex":{"status":"done","exit_code":0,"output":"Major issue: baseBranch is still null before preflight."}}}'
+    ;;
+  cleanup)
+    printf 'cleaned\n'
+    ;;
+  *)
+    echo "unexpected council command: $command_name" >&2
+    exit 90
+    ;;
+esac
+FAKE_COUNCIL
+  chmod +x "$fake_bin/council"
+}
+
+install_fake_council_failure() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/council" <<'FAKE_COUNCIL'
+#!/usr/bin/env bash
+set -euo pipefail
+
+calls_file="$(dirname "$0")/council-calls"
+command_name="${1:-}"
+shift || true
+printf '%s %s\n' "$command_name" "$*" >> "$calls_file"
+
+case "$command_name" in
+  ask)
+    cat >/dev/null
+    printf '%s\n' '{"runId":"run-456","members":["codex"],"dataDir":".council/run-456"}'
+    ;;
+  status)
+    printf '%s\n' '{"run_id":"run-456","running":false,"members":{"codex":{"status":"failed","exit_code":42,"bytes":0,"elapsed_seconds":2}}}'
+    ;;
+  cleanup)
+    printf 'cleaned\n'
+    ;;
+  *)
+    echo "unexpected council command: $command_name" >&2
+    exit 90
+    ;;
+esac
+FAKE_COUNCIL
+  chmod +x "$fake_bin/council"
+}
+
+install_fake_council_timeout() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/council" <<'FAKE_COUNCIL'
+#!/usr/bin/env bash
+set -euo pipefail
+
+calls_file="$(dirname "$0")/council-calls"
+command_name="${1:-}"
+shift || true
+printf '%s %s\n' "$command_name" "$*" >> "$calls_file"
+
+case "$command_name" in
+  ask)
+    cat >/dev/null
+    printf '%s\n' '{"runId":"run-789","members":["codex"],"dataDir":".council/run-789"}'
+    ;;
+  status)
+    printf '%s\n' '{"run_id":"run-789","running":true,"members":{"codex":{"status":"working","bytes":0,"elapsed_seconds":2}}}'
+    ;;
+  cleanup)
+    printf 'cleaned\n'
+    ;;
+  *)
+    echo "unexpected council command: $command_name" >&2
+    exit 90
+    ;;
+esac
+FAKE_COUNCIL
+  chmod +x "$fake_bin/council"
 }
 
 test_issue_must_be_positive_integer() {
@@ -295,6 +717,7 @@ test_run_rejects_failed_steps() {
   local issue output status
 
   issue="9002"
+  write_valid_context
   rm -rf "${WORKSPACES_DIR:?}/$issue"
   write_single_step_state "$issue" "stub-step" "failed"
 
@@ -308,10 +731,55 @@ test_run_rejects_failed_steps() {
   assert_contains "$output" "set status to pending or completed"
 }
 
+test_run_hard_stops_when_context_missing() {
+  local issue output status status_value
+
+  issue="9013"
+  remove_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  write_single_step_state "$issue" "stub-step" "pending"
+
+  set +e
+  output="$("$RALPH" --issue "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected missing CONTEXT.md to fail"
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  [[ "$status_value" == "pending" ]] || fail "expected step to remain pending, got $status_value"
+  assert_contains "$output" "CONTEXT.md not found"
+  assert_contains "$output" "$CONTEXT_FILE"
+}
+
+test_run_hard_stops_when_context_is_insufficient() {
+  local issue output status status_value fake_bin log_file
+
+  issue="9014"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_insufficient_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_context_check_claude "$fake_bin"
+  write_single_step_state "$issue" "stub-step" "pending"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" 2>&1)"
+  status=$?
+  set -e
+
+  [[ "$status" -ne 0 ]] || fail "expected insufficient CONTEXT.md to fail"
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  [[ "$status_value" == "pending" ]] || fail "expected step to remain pending, got $status_value"
+  log_file="$WORKSPACES_DIR/$issue/logs/check-context.log"
+  [[ -f "$log_file" ]] || fail "expected context check log file"
+  assert_contains "$output" "CONTEXT.md is insufficient"
+  assert_contains "$output" "Missing required sections"
+}
+
 test_run_completes_pending_agent_step() {
   local issue status_value log_file fake_bin
 
   issue="9003"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_claude "$fake_bin"
@@ -399,6 +867,7 @@ test_claude_agent_step_renders_prompt_logs_metrics_and_summary() {
   local issue output fake_bin log_file status_value duration_value input_tokens cost_value
 
   issue="9007"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_claude "$fake_bin"
@@ -455,6 +924,7 @@ test_codex_agent_step_logs_jsonl_and_records_metrics() {
   local issue output fake_bin log_file status_value input_tokens output_tokens cost_value
 
   issue="9008"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_codex "$fake_bin"
@@ -501,6 +971,7 @@ test_sigint_resets_running_step_to_pending_and_rerun_picks_it_up() {
   local issue output fake_bin status first_status second_status
 
   issue="9009"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_interrupt_once_claude "$fake_bin"
@@ -543,6 +1014,7 @@ test_blocked_step_stops_then_resumes_with_human_answers() {
   local issue output fake_bin flag_file status_value log_file
 
   issue="9010"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_hitl_claude "$fake_bin"
@@ -589,6 +1061,7 @@ test_failed_agent_invocation_marks_step_failed_and_exits_one() {
   local issue output fake_bin status status_value
 
   issue="9011"
+  write_valid_context
   fake_bin="$WORKSPACES_DIR/fake-bin"
   rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
   install_fake_failing_claude "$fake_bin"
@@ -721,9 +1194,142 @@ test_initialized_workspace_status_shows_four_pending_fixed_steps() {
   assert_contains "$output" "preflight"
 }
 
+test_council_review_submits_polls_reads_cleans_up_and_prints_review() {
+  local fake_bin output calls
+
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "$fake_bin"
+  install_fake_council_success "$fake_bin"
+
+  output="$(printf 'Review these decisions' | PATH="$fake_bin:$PATH" RALPH_COUNCIL_POLL_INTERVAL=0 "$ROOT_DIR/scripts/council-review.sh")"
+  calls="$(<"$fake_bin/council-calls")"
+
+  assert_contains "$output" "Major issue: baseBranch is still null"
+  assert_contains "$calls" "ask"
+  assert_contains "$calls" "status"
+  assert_contains "$calls" "read"
+  assert_contains "$calls" "cleanup"
+}
+
+test_council_review_handles_member_failure_and_cleans_up() {
+  local fake_bin output calls status
+
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "$fake_bin"
+  install_fake_council_failure "$fake_bin"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" RALPH_COUNCIL_POLL_INTERVAL=0 "$ROOT_DIR/scripts/council-review.sh" "Review these decisions" 2>&1)"
+  status=$?
+  set -e
+  calls="$(<"$fake_bin/council-calls")"
+
+  [[ "$status" -ne 0 ]] || fail "expected failed council member to fail"
+  assert_contains "$output" "council member failed"
+  assert_contains "$calls" "cleanup"
+}
+
+test_council_review_handles_timeout_and_cleans_up() {
+  local fake_bin output calls status
+
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  rm -rf "$fake_bin"
+  install_fake_council_timeout "$fake_bin"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" RALPH_COUNCIL_TIMEOUT_SECONDS=0 RALPH_COUNCIL_POLL_INTERVAL=0 "$ROOT_DIR/scripts/council-review.sh" "Review these decisions" 2>&1)"
+  status=$?
+  set -e
+  calls="$(<"$fake_bin/council-calls")"
+
+  [[ "$status" -ne 0 ]] || fail "expected council timeout to fail"
+  assert_contains "$output" "timed out"
+  assert_contains "$calls" "cleanup"
+}
+
+test_review_decisions_prompt_defines_council_filtering_and_hitl_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/review-decisions.md"
+  [[ -f "$prompt_file" ]] || fail "expected review-decisions prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "CONTEXT.md"
+  assert_contains "$prompt" "CLAUDE.md"
+  assert_contains "$prompt" "docs/adr"
+  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "Major feedback"
+  assert_contains "$prompt" "nitpicks"
+  assert_contains "$prompt" "review-decisions.md"
+  assert_contains "$prompt" "hitl-{{STEP_ID}}.md"
+  assert_contains "$prompt" "complete WITHOUT re-running council review"
+}
+
+test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
+  local issue fake_bin output flag_file findings_file status_value log_file status
+
+  issue="9015"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_review_decisions_claude "$fake_bin"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: null,
+      branch: null,
+      status: "initialized",
+      steps: [
+        {
+          id: "review-decisions",
+          phase: "fixed",
+          type: "review-decisions",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: true,
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  set +e
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" 2>&1)"
+  status=$?
+  set -e
+  [[ "$status" -eq 0 ]] || fail "expected review-decisions first run to block cleanly, got $status: $output"
+  flag_file="$WORKSPACES_DIR/$issue/hitl-review-decisions.md"
+  findings_file="$WORKSPACES_DIR/$issue/review-decisions.md"
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+
+  [[ "$status_value" == "blocked" ]] || fail "expected review-decisions to block, got $status_value"
+  [[ -f "$WORKSPACES_DIR/$issue/logs/check-context.log" ]] || fail "expected context check log file"
+  [[ -f "$findings_file" ]] || fail "expected review-decisions findings file"
+  [[ -f "$flag_file" ]] || fail "expected HITL flag file"
+  assert_contains "$output" "blocked for human input"
+  assert_contains "$(<"$findings_file")" "Major issue"
+  [[ "$(<"$findings_file")" != *"nitpick"* ]] || fail "expected findings to filter nitpicks"
+
+  printf "\nUse the architecture option\n" >> "$flag_file"
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  log_file="$WORKSPACES_DIR/$issue/logs/review-decisions.log"
+  [[ "$status_value" == "completed" ]] || fail "expected review-decisions to complete after answers, got $status_value"
+  assert_contains "$(tr '\n' ' ' < "$log_file")" "completed without rerunning council"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
+test_run_hard_stops_when_context_missing
+test_run_hard_stops_when_context_is_insufficient
 test_run_completes_pending_agent_step
 test_status_prints_step_table
 test_logs_tails_active_step_log
@@ -735,5 +1341,10 @@ test_blocked_step_stops_then_resumes_with_human_answers
 test_failed_agent_invocation_marks_step_failed_and_exits_one
 test_init_prompt_defines_complete_workspace_initialization_contract
 test_initialized_workspace_status_shows_four_pending_fixed_steps
+test_council_review_submits_polls_reads_cleans_up_and_prints_review
+test_council_review_handles_member_failure_and_cleans_up
+test_council_review_handles_timeout_and_cleans_up
+test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
+test_review_decisions_runs_after_context_check_and_blocks_then_resumes
 
 echo "All ralph-v2 tests passed"

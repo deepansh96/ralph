@@ -9,6 +9,8 @@ source "$SCRIPT_DIR/scripts/state.sh"
 source "$SCRIPT_DIR/scripts/status.sh"
 # shellcheck source=ralph-v2/scripts/logs.sh
 source "$SCRIPT_DIR/scripts/logs.sh"
+# shellcheck source=ralph-v2/scripts/context.sh
+source "$SCRIPT_DIR/scripts/context.sh"
 # shellcheck source=ralph-v2/scripts/prompt.sh
 source "$SCRIPT_DIR/scripts/prompt.sh"
 # shellcheck source=ralph-v2/scripts/metrics.sh
@@ -221,6 +223,7 @@ case "$COMMAND" in
   run)
     STATE_FILE="$SCRIPT_DIR/workspaces/$ISSUE/state.json"
     state_validate "$STATE_FILE"
+    context_check "$SCRIPT_DIR" "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE"
     run_pipeline "$STATE_FILE" "$SCRIPT_DIR/workspaces/$ISSUE"
     ;;
   status|logs)

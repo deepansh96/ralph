@@ -8,7 +8,7 @@ WORKSPACES_DIR="$ROOT_DIR/workspaces"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018 9019 9020)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -724,6 +724,95 @@ if [[ -n "$last_message_file" ]]; then
 fi
 
 printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":13,"output_tokens":8}}'
+FAKE_CODEX
+  chmod +x "$fake_bin/codex"
+
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+jq -n '{
+  result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+  duration_ms: 100,
+  usage: {
+    input_tokens: 1,
+    output_tokens: 1
+  },
+  total_cost_usd: 0.01
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_implement_slice_codex() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/codex" <<'FAKE_CODEX'
+#!/usr/bin/env bash
+set -euo pipefail
+
+last_message_file=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output-last-message)
+      last_message_file="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+prompt="$(cat)"
+[[ "$prompt" == *"Issue: 9020"* ]] || exit 101
+[[ "$prompt" == *"Repo: deepansh96/ralph"* ]] || exit 102
+[[ "$prompt" == *"Workspace: "*"/ralph-v2/workspaces/9020"* ]] || exit 103
+[[ "$prompt" == *"Branch: feat/issue-9020-implementation-workflow"* ]] || exit 104
+[[ "$prompt" == *"Base branch: main"* ]] || exit 105
+[[ "$prompt" == *"Step: implement-slice-9111"* ]] || exit 106
+[[ "$prompt" == *"Sub-issue: 9111"* ]] || exit 107
+[[ "$prompt" == *"Skills: "*"/ralph-v2/skills"* ]] || exit 108
+[[ "$prompt" == *"CONTEXT.md"* ]] || exit 109
+[[ "$prompt" == *"CLAUDE.md"* ]] || exit 110
+[[ "$prompt" == *"docs/adr"* ]] || exit 111
+[[ "$prompt" == *"tdd/SKILL.md"* ]] || exit 112
+[[ "$prompt" == *"tdd/tests.md"* ]] || exit 113
+[[ "$prompt" == *"tdd/mocking.md"* ]] || exit 114
+[[ "$prompt" == *"tdd/deep-modules.md"* ]] || exit 115
+[[ "$prompt" == *"tdd/interface-design.md"* ]] || exit 116
+[[ "$prompt" == *"tdd/refactoring.md"* ]] || exit 117
+[[ "$prompt" == *"gh issue view 9020 --repo deepansh96/ralph"* ]] || exit 118
+[[ "$prompt" == *"gh issue view 9111 --repo deepansh96/ralph"* ]] || exit 119
+[[ "$prompt" == *"Write one failing test first"* ]] || exit 120
+[[ "$prompt" == *"Run quality checks from CLAUDE.md"* ]] || exit 121
+[[ "$prompt" == *"git checkout feat/issue-9020-implementation-workflow"* ]] || exit 122
+[[ "$prompt" == *"git commit"* ]] || exit 123
+[[ "$prompt" == *"#9111"* ]] || exit 124
+[[ "$prompt" == *"git push"* ]] || exit 125
+[[ "$prompt" == *"gh issue close 9111 --repo deepansh96/ralph"* ]] || exit 126
+[[ "$prompt" == *"agent: codex"* ]] || exit 127
+[[ "$prompt" == *"AFK"* ]] || exit 128
+
+if [[ -n "$last_message_file" ]]; then
+  printf 'implemented, committed, pushed, and closed sub-issue\n' > "$last_message_file"
+fi
+
+printf '%s\n' '{"type":"turn.completed","usage":{"input_tokens":21,"output_tokens":34}}'
 FAKE_CODEX
   chmod +x "$fake_bin/codex"
 
@@ -1531,6 +1620,44 @@ test_preflight_prompt_defines_full_preflight_workflow_contract() {
   assert_contains "$prompt" "idempotent"
 }
 
+test_implement_slice_prompt_defines_full_implementation_workflow_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/implement-slice.md"
+  [[ -f "$prompt_file" ]] || fail "expected implement-slice prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "Issue: {{ISSUE}}"
+  assert_contains "$prompt" "Repo: {{REPO}}"
+  assert_contains "$prompt" "Workspace: {{WORKSPACE}}"
+  assert_contains "$prompt" "Branch: {{BRANCH}}"
+  assert_contains "$prompt" "Base branch: {{BASE_BRANCH}}"
+  assert_contains "$prompt" "Step: {{STEP_ID}}"
+  assert_contains "$prompt" "Sub-issue: {{SUB_ISSUE}}"
+  assert_contains "$prompt" "Skills: {{SKILLS_DIR}}"
+  assert_contains "$prompt" "agent: codex"
+  assert_contains "$prompt" "AFK"
+  assert_contains "$prompt" "CONTEXT.md"
+  assert_contains "$prompt" "CLAUDE.md"
+  assert_contains "$prompt" "docs/adr"
+  assert_contains "$prompt" "tdd/SKILL.md"
+  assert_contains "$prompt" "tdd/tests.md"
+  assert_contains "$prompt" "tdd/mocking.md"
+  assert_contains "$prompt" "tdd/deep-modules.md"
+  assert_contains "$prompt" "tdd/interface-design.md"
+  assert_contains "$prompt" "tdd/refactoring.md"
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "gh issue view {{SUB_ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "Write one failing test first"
+  assert_contains "$prompt" "Run quality checks from CLAUDE.md"
+  assert_contains "$prompt" "git checkout {{BRANCH}}"
+  assert_contains "$prompt" "git commit"
+  assert_contains "$prompt" "#{{SUB_ISSUE}}"
+  assert_contains "$prompt" "git push"
+  assert_contains "$prompt" "gh issue close {{SUB_ISSUE}} --repo {{REPO}}"
+}
+
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates() {
   local issue state_file duplicate_output status ids agents sub_issues output
 
@@ -1844,6 +1971,55 @@ test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently() {
   [[ "$issue_count" == "2" ]] || fail "expected rerun not to create duplicate sub-issues, got $issue_count entries"
 }
 
+test_implement_slice_pipeline_runs_codex_with_sub_issue_context() {
+  local issue fake_bin status_value log_file input_tokens output_tokens output
+
+  issue="9020"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_implement_slice_codex "$fake_bin"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: "main",
+      branch: "feat/issue-9020-implementation-workflow",
+      status: "initialized",
+      steps: [
+        {
+          id: "implement-slice-9111",
+          phase: "dynamic",
+          type: "implement-slice",
+          agent: "codex",
+          reviewer: null,
+          hitl: false,
+          status: "pending",
+          sub_issue: 9111,
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  output="$(PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue")"
+
+  status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
+  input_tokens="$(jq -r '.steps[0].metrics.input_tokens' "$WORKSPACES_DIR/$issue/state.json")"
+  output_tokens="$(jq -r '.steps[0].metrics.output_tokens' "$WORKSPACES_DIR/$issue/state.json")"
+  log_file="$WORKSPACES_DIR/$issue/logs/implement-slice-9111.log"
+
+  [[ "$status_value" == "completed" ]] || fail "expected implement-slice to complete, got $status_value"
+  [[ "$input_tokens" == "21" ]] || fail "expected implement-slice input_tokens metric, got $input_tokens"
+  [[ "$output_tokens" == "34" ]] || fail "expected implement-slice output_tokens metric, got $output_tokens"
+  [[ -f "$log_file" ]] || fail "expected implement-slice log file"
+  assert_contains "$(tr '\n' ' ' < "$log_file")" "turn.completed"
+  assert_contains "$output" "implement-slice-9111"
+  assert_contains "$output" "codex"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -1867,9 +2043,11 @@ test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
 test_create_prd_prompt_defines_full_prd_workflow_contract
 test_create_slices_prompt_defines_full_slice_creation_contract
 test_preflight_prompt_defines_full_preflight_workflow_contract
+test_implement_slice_prompt_defines_full_implementation_workflow_contract
 test_state_add_steps_appends_dynamic_steps_and_rejects_duplicates
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes
 test_create_prd_pipeline_preserves_original_and_updates_single_prd_body
 test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently
+test_implement_slice_pipeline_runs_codex_with_sub_issue_context
 
 echo "All ralph-v2 tests passed"

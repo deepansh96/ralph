@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RALPH="$ROOT_DIR/ralph.sh"
 WORKSPACES_DIR="$ROOT_DIR/workspaces"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012)
 
 cleanup() {
   local issue
@@ -623,6 +623,104 @@ test_failed_agent_invocation_marks_step_failed_and_exits_one() {
   [[ "$status_value" == "failed" ]] || fail "expected failed agent step to be marked failed, got $status_value"
 }
 
+test_init_prompt_defines_complete_workspace_initialization_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/init.md"
+  [[ -f "$prompt_file" ]] || fail "expected init prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "command -v gh"
+  assert_contains "$prompt" "workspaces/{{ISSUE}}"
+  assert_contains "$prompt" "must not overwrite"
+  assert_contains "$prompt" '"baseBranch": null'
+  assert_contains "$prompt" '"branch": null'
+  assert_contains "$prompt" '"status": "initialized"'
+  assert_contains "$prompt" '"phase": "fixed"'
+  assert_contains "$prompt" '"metrics": null'
+  assert_contains "$prompt" '"reviewer": null'
+  assert_contains "$prompt" "review-decisions"
+  assert_contains "$prompt" "create-prd"
+  assert_contains "$prompt" "create-slices"
+  assert_contains "$prompt" "preflight"
+  assert_contains "$prompt" "ralph.sh status --issue {{ISSUE}}"
+}
+
+test_initialized_workspace_status_shows_four_pending_fixed_steps() {
+  local issue output pending_count
+
+  issue="9012"
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: null,
+      branch: null,
+      status: "initialized",
+      createdAt: "2026-05-02T00:00:00Z",
+      steps: [
+        {
+          id: "review-decisions",
+          phase: "fixed",
+          type: "review-decisions",
+          status: "pending",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: true,
+          metrics: null,
+          notes: ""
+        },
+        {
+          id: "create-prd",
+          phase: "fixed",
+          type: "create-prd",
+          status: "pending",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: false,
+          metrics: null,
+          notes: ""
+        },
+        {
+          id: "create-slices",
+          phase: "fixed",
+          type: "create-slices",
+          status: "pending",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: false,
+          metrics: null,
+          notes: ""
+        },
+        {
+          id: "preflight",
+          phase: "fixed",
+          type: "preflight",
+          status: "pending",
+          agent: "claude",
+          reviewer: null,
+          hitl: false,
+          metrics: null,
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  output="$("$RALPH" status --issue "$issue")"
+  pending_count="$(grep -c "pending" <<<"$output")"
+
+  [[ "$pending_count" == "4" ]] || fail "expected 4 pending steps in status output, got $pending_count: $output"
+  assert_contains "$output" "review-decisions"
+  assert_contains "$output" "create-prd"
+  assert_contains "$output" "create-slices"
+  assert_contains "$output" "preflight"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -635,5 +733,7 @@ test_codex_agent_step_logs_jsonl_and_records_metrics
 test_sigint_resets_running_step_to_pending_and_rerun_picks_it_up
 test_blocked_step_stops_then_resumes_with_human_answers
 test_failed_agent_invocation_marks_step_failed_and_exits_one
+test_init_prompt_defines_complete_workspace_initialization_contract
+test_initialized_workspace_status_shows_four_pending_fixed_steps
 
 echo "All ralph-v2 tests passed"

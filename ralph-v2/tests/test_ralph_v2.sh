@@ -8,7 +8,7 @@ WORKSPACES_DIR="$ROOT_DIR/workspaces"
 CONTEXT_FILE="$PROJECT_ROOT/CONTEXT.md"
 INITIAL_CONTEXT_BACKUP="$(mktemp)"
 INITIAL_CONTEXT_PRESENT="false"
-TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016)
+TEST_ISSUES=(9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9018)
 
 if [[ -f "$CONTEXT_FILE" ]]; then
   cp "$CONTEXT_FILE" "$INITIAL_CONTEXT_BACKUP"
@@ -570,6 +570,88 @@ jq -n '{
     output_tokens: 4
   },
   total_cost_usd: 0.04
+}'
+FAKE_CLAUDE
+  chmod +x "$fake_bin/claude"
+}
+
+install_fake_create_slices_claude() {
+  local fake_bin="$1"
+
+  mkdir -p "$fake_bin"
+  cat > "$fake_bin/claude" <<'FAKE_CLAUDE'
+#!/usr/bin/env bash
+set -euo pipefail
+
+prompt=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+if [[ "$prompt" == *"CONTEXT_CHECK_REQUIRED"* ]]; then
+  jq -n '{
+    result: "CONTEXT_CHECK: PASS\nCONTEXT.md follows the required format.",
+    duration_ms: 100,
+    usage: {
+      input_tokens: 1,
+      output_tokens: 1
+    },
+    total_cost_usd: 0.01
+  }'
+  exit 0
+fi
+
+workspace="$(awk '/^Workspace:/ { print $2; exit }' <<<"$prompt")"
+slices_file="$workspace/slices.md"
+sub_issues_file="$workspace/github-sub-issues.md"
+
+[[ "$prompt" == *"gh issue view"* ]] || exit 81
+[[ "$prompt" == *"CONTEXT.md"* ]] || exit 82
+[[ "$prompt" == *"CLAUDE.md"* ]] || exit 83
+[[ "$prompt" == *"docs/adr"* ]] || exit 84
+[[ "$prompt" == *"to-issues"* ]] || exit 85
+[[ "$prompt" == *"tracer bullets"* ]] || exit 86
+[[ "$prompt" == *"Round 1"* ]] || exit 87
+[[ "$prompt" == *"Round 2"* ]] || exit 88
+[[ "$prompt" == *"gh issue create"* ]] || exit 89
+[[ "$prompt" == *"addSubIssue"* ]] || exit 90
+[[ "$prompt" == *"AFK"* ]] || exit 91
+[[ "$prompt" == *"duplicates"* ]] || exit 92
+
+if [[ ! -f "$sub_issues_file" ]]; then
+  cat > "$sub_issues_file" <<'ISSUES'
+# Created Sub-Issues
+
+- #9101 Slice: prompt contract (AFK: true, linked via addSubIssue)
+- #9102 Slice: idempotent creation (AFK: true, linked via addSubIssue)
+ISSUES
+fi
+
+cat > "$slices_file" <<'SLICES'
+# Slices
+
+## Created or reused sub-issues
+
+- #9101 newly created and linked
+- #9102 newly created and linked
+SLICES
+
+jq -n '{
+  result: "create-slices created AFK sub-issues and linked them under parent",
+  duration_ms: 444,
+  usage: {
+    input_tokens: 6,
+    output_tokens: 5
+  },
+  total_cost_usd: 0.05
 }'
 FAKE_CLAUDE
   chmod +x "$fake_bin/claude"
@@ -1397,6 +1479,31 @@ test_create_prd_prompt_defines_full_prd_workflow_contract() {
   assert_contains "$prompt" "idempotent"
 }
 
+test_create_slices_prompt_defines_full_slice_creation_contract() {
+  local prompt_file prompt
+
+  prompt_file="$ROOT_DIR/prompts/create-slices.md"
+  [[ -f "$prompt_file" ]] || fail "expected create-slices prompt template at $prompt_file"
+
+  prompt="$(<"$prompt_file")"
+
+  assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
+  assert_contains "$prompt" "CONTEXT.md"
+  assert_contains "$prompt" "CLAUDE.md"
+  assert_contains "$prompt" "docs/adr"
+  assert_contains "$prompt" "to-issues"
+  assert_contains "$prompt" "tracer bullets"
+  assert_contains "$prompt" "horizontal"
+  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "Round 1"
+  assert_contains "$prompt" "Round 2"
+  assert_contains "$prompt" "gh issue create"
+  assert_contains "$prompt" "addSubIssue"
+  assert_contains "$prompt" "AFK"
+  assert_contains "$prompt" "existing sub-issues"
+  assert_contains "$prompt" "duplicates"
+}
+
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes() {
   local issue fake_bin output flag_file findings_file status_value log_file status
 
@@ -1526,6 +1633,83 @@ test_create_prd_pipeline_preserves_original_and_updates_single_prd_body() {
   [[ "$problem_count" == "1" ]] || fail "expected one Problem Statement after rerun, got $problem_count"
 }
 
+test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently() {
+  local issue fake_bin slices_file sub_issues_file status_value log_file issue_count
+
+  issue="9018"
+  fake_bin="$WORKSPACES_DIR/fake-bin"
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue" "$fake_bin"
+  install_fake_create_slices_claude "$fake_bin"
+  mkdir -p "$WORKSPACES_DIR/$issue/logs"
+  jq -n \
+    --arg issue "$issue" \
+    '{
+      issue: ($issue | tonumber),
+      repo: "deepansh96/ralph",
+      baseBranch: null,
+      branch: null,
+      status: "initialized",
+      steps: [
+        {
+          id: "review-decisions",
+          phase: "fixed",
+          type: "review-decisions",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: true,
+          status: "completed",
+          metrics: {},
+          notes: ""
+        },
+        {
+          id: "create-prd",
+          phase: "fixed",
+          type: "create-prd",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: false,
+          status: "completed",
+          metrics: {},
+          notes: ""
+        },
+        {
+          id: "create-slices",
+          phase: "fixed",
+          type: "create-slices",
+          agent: "claude",
+          reviewer: "codex",
+          hitl: false,
+          status: "pending",
+          metrics: {},
+          notes: ""
+        }
+      ]
+    }' > "$WORKSPACES_DIR/$issue/state.json"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  slices_file="$WORKSPACES_DIR/$issue/slices.md"
+  sub_issues_file="$WORKSPACES_DIR/$issue/github-sub-issues.md"
+  log_file="$WORKSPACES_DIR/$issue/logs/create-slices.log"
+  status_value="$(jq -r '.steps[2].status' "$WORKSPACES_DIR/$issue/state.json")"
+
+  [[ "$status_value" == "completed" ]] || fail "expected create-slices to complete, got $status_value"
+  [[ -f "$slices_file" ]] || fail "expected final slices file"
+  [[ -f "$sub_issues_file" ]] || fail "expected sub-issue fixture file"
+  assert_contains "$(<"$sub_issues_file")" "AFK: true"
+  assert_contains "$(<"$sub_issues_file")" "addSubIssue"
+  assert_contains "$(tr '\n' ' ' < "$log_file")" "create-slices created AFK sub-issues"
+
+  jq '.steps[2].status = "pending"' "$WORKSPACES_DIR/$issue/state.json" > "$WORKSPACES_DIR/$issue/state.json.tmp"
+  mv "$WORKSPACES_DIR/$issue/state.json.tmp" "$WORKSPACES_DIR/$issue/state.json"
+
+  PATH="$fake_bin:$PATH" "$RALPH" --issue "$issue" >/dev/null
+
+  issue_count="$(grep -c '^-' "$sub_issues_file")"
+  [[ "$issue_count" == "2" ]] || fail "expected rerun not to create duplicate sub-issues, got $issue_count entries"
+}
+
 test_issue_must_be_positive_integer
 test_run_requires_existing_state
 test_run_rejects_failed_steps
@@ -1547,7 +1731,9 @@ test_council_review_handles_member_failure_and_cleans_up
 test_council_review_handles_timeout_and_cleans_up
 test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
 test_create_prd_prompt_defines_full_prd_workflow_contract
+test_create_slices_prompt_defines_full_slice_creation_contract
 test_review_decisions_runs_after_context_check_and_blocks_then_resumes
 test_create_prd_pipeline_preserves_original_and_updates_single_prd_body
+test_create_slices_pipeline_creates_linked_afk_sub_issues_idempotently
 
 echo "All ralph-v2 tests passed"

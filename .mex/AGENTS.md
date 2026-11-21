@@ -1,16 +1,16 @@
 ---
 name: agents
-description: Always-loaded project anchor for Ralph v2. Read this first, then load ROUTER.md for task-specific context.
+description: Always-loaded project anchor for Ralph. Read this first, then load ROUTER.md for task-specific context.
 last_updated: 2026-07-09
 ---
 
-# Ralph v2
+# Ralph
 
 ## What This Is
-Ralph v2 is a shell-based GitHub issue pipeline that grills, plans, implements, reviews, and opens a PR for one feature.
+Ralph is a shell-based GitHub issue pipeline that grills, plans, implements, reviews, and opens a PR for one feature.
 
 ## Non-Negotiables
-- Run Ralph commands from the project root, not from inside `ralph-v2/`.
+- Run Ralph commands from the project root, not from inside `ralph/`.
 - Never pipe `ralph.sh --issue N` through `head`, `tail`, or similar commands.
 - Treat `workspaces/<issue>/state.json` as the single source of truth for pipeline progress.
 - Keep `baseBranch` explicit before preflight; use a pushed `grill/*` branch for speculative planning docs.

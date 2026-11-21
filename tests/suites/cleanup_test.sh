@@ -89,7 +89,7 @@ test_cleanup_removes_empty_workspaces_directory() {
   mkdir -p "$test_workspaces/$issue"
   printf "state\n" > "$test_workspaces/$issue/state.json"
 
-  output="$(RALPH_V2_WORKSPACES_DIR="$test_workspaces" "$CLEANUP_SCRIPT" "$issue")"
+  output="$(RALPH_WORKSPACES_DIR="$test_workspaces" "$CLEANUP_SCRIPT" "$issue")"
 
   [[ -d "$destination" ]] || fail "expected archived workspace"
   [[ ! -d "$test_workspaces" ]] || fail "expected empty workspaces directory to be removed"

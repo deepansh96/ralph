@@ -5,9 +5,9 @@
 # gh writes. Agents are reached only through the session adapters.
 
 GRILL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=ralph-v2/scripts/grill-record.sh
+# shellcheck source=ralph/scripts/grill-record.sh
 source "$GRILL_SCRIPT_DIR/grill-record.sh"
-# shellcheck source=ralph-v2/scripts/grill-adapters.sh
+# shellcheck source=ralph/scripts/grill-adapters.sh
 source "$GRILL_SCRIPT_DIR/grill-adapters.sh"
 
 grill_usage() {

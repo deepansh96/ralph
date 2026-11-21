@@ -49,4 +49,4 @@ for suite in "${suites[@]}"; do
   "$suite_path"
 done
 
-echo "All ralph-v2 tests passed"
+echo "All ralph tests passed"

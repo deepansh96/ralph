@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: How Ralph v2 pipeline pieces connect and flow. Load when working on system design, integrations, prompt dispatch, or state behavior.
+description: How Ralph pipeline pieces connect and flow. Load when working on system design, integrations, prompt dispatch, or state behavior.
 triggers:
   - "architecture"
   - "pipeline"

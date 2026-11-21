@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Dev environment setup and commands for Ralph v2. Load when setting up the repo, running tests, or debugging local environment issues.
+description: Dev environment setup and commands for Ralph. Load when setting up the repo, running tests, or debugging local environment issues.
 triggers:
   - "setup"
   - "install"
@@ -36,13 +36,13 @@ last_updated: 2026-09-27
 
 ## First-time Setup
 
-1. Clone this repository as `ralph-v2/` inside a target project root when using it as a project-local pipeline.
+1. Clone this repository as `ralph/` inside a target project root when using it as a project-local pipeline.
 2. Ensure the target project root has `CONTEXT.md` and `CLAUDE.md` or `AGENTS.md` with the target project's instructions.
 3. Authenticate GitHub CLI: `gh auth status`.
 4. From the project root, create a GitHub issue through the grilling flow or manually.
-5. Run the init prompt for the issue: `Read ralph-v2/prompts/init.md and execute it for issue N in repo owner/repo`.
-6. Set `.baseBranch` in `ralph-v2/workspaces/N/state.json` before preflight.
-7. Run the pipeline from the project root: `./ralph-v2/ralph.sh --issue N`.
+5. Run the init prompt for the issue: `Read ralph/prompts/init.md and execute it for issue N in repo owner/repo`.
+6. Set `.baseBranch` in `ralph/workspaces/N/state.json` before preflight.
+7. Run the pipeline from the project root: `./ralph/ralph.sh --issue N`.
 
 For this repository's own tests and maintenance, run commands from this repository root, where the scripts are `./ralph.sh`, `./tests/run.sh`, and `./cleanup.sh`.
 

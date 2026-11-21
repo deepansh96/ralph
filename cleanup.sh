@@ -27,7 +27,7 @@ is_positive_integer() {
 ISSUE="$1"
 is_positive_integer "$ISSUE" || die "issue number must be a positive integer"
 
-WORKSPACES_BASE="${RALPH_V2_WORKSPACES_DIR:-$SCRIPT_DIR/workspaces}"
+WORKSPACES_BASE="${RALPH_WORKSPACES_DIR:-${RALPH_V2_WORKSPACES_DIR:-$SCRIPT_DIR/workspaces}}"
 WORKSPACE_DIR="$WORKSPACES_BASE/$ISSUE"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 DATE="$(date +%Y-%m-%d)"

@@ -434,7 +434,7 @@ test_runthrough_qa_checklist_prompt_defines_execution_and_progress_contract() {
   # qa-v1 plan timing, packet markers, Codex task naming, progress format.
   assert_contains "$prompt" "Before the first spawn"
   assert_contains "$prompt" "delegation_qa_plan_write {{WORKSPACE}}/state.json {{STEP_ID}} {{REPO}} <comment-id>"
-  assert_contains "$prompt" "./ralph-v2/scripts/delegation-qa.sh"
+  assert_contains "$prompt" "./ralph/scripts/delegation-qa.sh"
   assert_contains "$prompt" "{{WORKSPACE}}/delegation/{{STEP_ID}}.plan.json"
   assert_contains "$prompt" "Never write, edit, or regenerate the plan"
   assert_contains "$prompt" "RALPH-TASK: <taskId>"

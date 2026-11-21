@@ -3,25 +3,25 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# shellcheck source=ralph-v2/scripts/state.sh
+# shellcheck source=ralph/scripts/state.sh
 source "$SCRIPT_DIR/scripts/state.sh"
-# shellcheck source=ralph-v2/scripts/parse-log.sh
+# shellcheck source=ralph/scripts/parse-log.sh
 source "$SCRIPT_DIR/scripts/parse-log.sh"
-# shellcheck source=ralph-v2/scripts/status.sh
+# shellcheck source=ralph/scripts/status.sh
 source "$SCRIPT_DIR/scripts/status.sh"
-# shellcheck source=ralph-v2/scripts/logs.sh
+# shellcheck source=ralph/scripts/logs.sh
 source "$SCRIPT_DIR/scripts/logs.sh"
-# shellcheck source=ralph-v2/scripts/context.sh
+# shellcheck source=ralph/scripts/context.sh
 source "$SCRIPT_DIR/scripts/context.sh"
-# shellcheck source=ralph-v2/scripts/prompt.sh
+# shellcheck source=ralph/scripts/prompt.sh
 source "$SCRIPT_DIR/scripts/prompt.sh"
-# shellcheck source=ralph-v2/scripts/metrics.sh
+# shellcheck source=ralph/scripts/metrics.sh
 source "$SCRIPT_DIR/scripts/metrics.sh"
-# shellcheck source=ralph-v2/scripts/agent.sh
+# shellcheck source=ralph/scripts/agent.sh
 source "$SCRIPT_DIR/scripts/agent.sh"
-# shellcheck source=ralph-v2/scripts/grill.sh
+# shellcheck source=ralph/scripts/grill.sh
 source "$SCRIPT_DIR/scripts/grill.sh"
-# shellcheck source=ralph-v2/scripts/delegation-gate.sh
+# shellcheck source=ralph/scripts/delegation-gate.sh
 source "$SCRIPT_DIR/scripts/delegation-gate.sh"
 
 usage() {

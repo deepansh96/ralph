@@ -1,6 +1,6 @@
 ---
 name: stack
-description: Technology stack, tool choices, and version constraints for Ralph v2. Load when working with shell, jq, GitHub, Claude, Codex, Pi, council, or mex.
+description: Technology stack, tool choices, and version constraints for Ralph. Load when working with shell, jq, GitHub, Claude, Codex, Pi, council, or mex.
 triggers:
   - "library"
   - "dependency"

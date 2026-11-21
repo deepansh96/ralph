@@ -1,6 +1,6 @@
 ---
 name: decisions
-description: Key Ralph v2 architectural and workflow decisions with reasoning. Load when changing pipeline policy or understanding why behavior exists.
+description: Key Ralph architectural and workflow decisions with reasoning. Load when changing pipeline policy or understanding why behavior exists.
 triggers:
   - "why do we"
   - "decision"

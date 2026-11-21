@@ -52,7 +52,7 @@ If `reviewRounds` is missing, default to 0.
 Round 1 (skip if `reviewRounds` is 0):
 
 ```bash
-./ralph-v2/scripts/council-review.sh --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+./ralph/scripts/council-review.sh --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
 
 Review the draft vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on:
 1. HORIZONTAL SLICING — Are any slices horizontal (single layer) rather than vertical (end-to-end demoable)? Exception: expand–contract slices for a wide refactor are legitimate — but check their sequencing (expand first, migrates blocked by expand, contract blocked by every migrate).
@@ -76,7 +76,7 @@ Incorporate verified Round 1 feedback into the slice list. Keep major feedback t
 Round 2 (skip if `reviewRounds` is less than 2):
 
 ```bash
-./ralph-v2/scripts/council-review.sh --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+./ralph/scripts/council-review.sh --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
 
 Review the revised vertical slices for GitHub issue {{ISSUE}} in repo {{REPO}}. Focus on remaining blockers, duplicate or overlapping slices, missing AFK criteria, unresolved dependencies, merge conflict risk between parallel slices, and contradictions introduced while incorporating Round 1 feedback."
 ```

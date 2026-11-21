@@ -1,6 +1,6 @@
 # Setup - mex Scaffold
 
-This mex scaffold is already populated for Ralph v2.
+This mex scaffold is already populated for Ralph.
 
 ## Recreate The Scaffold
 

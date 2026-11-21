@@ -1,4 +1,4 @@
-RALPH V2 PIPELINE — OPERATIONAL GUIDE
+RALPH PIPELINE — OPERATIONAL GUIDE
 ======================================
 Lessons from running issue #266 (Remove Eraser Tool) end-to-end.
 

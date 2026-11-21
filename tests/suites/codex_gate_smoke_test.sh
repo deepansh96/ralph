@@ -42,7 +42,7 @@ step="$(awk '/^Step:/ { print $2; exit }' <<< "$prompt")"
 parent="parent_smoke"
 # The parent finds the marked comment, plans, and spawns from the project root.
 id="$(gh api "repos/$repo/issues/1/comments" --jq '.[] | select(.body | contains("<!-- ralph:qa-checklist -->")) | .id')"
-source ./ralph-v2/scripts/delegation-qa.sh
+source ./ralph/scripts/delegation-qa.sh
 plan="$(delegation_qa_plan_write "$workspace/state.json" "$step" "$repo" "$id" <<< '[{"taskId":"qa_group_1","checklistItemIds":["QA-01"]}]')"
 hex="$(jq -r '.assignments[0].assignmentDigest | ltrimstr("sha256:")' <<< "$plan")"
 case "$mode" in

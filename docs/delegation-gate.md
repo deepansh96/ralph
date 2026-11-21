@@ -167,7 +167,7 @@ CLAUDE_CONFIG_DIR="$HOME/.claude-t4d-api" RALPH_CLAUDE_GATE_SMOKE=1 \
 ```
 
 The test creates a disposable git project with a local `origin` and a one-line
-PR change. It links `ralph-v2` to this checkout and puts a local `gh` stub
+PR change. It links `ralph` to this checkout and puts a local `gh` stub
 (`tests/probes/claude-gate-smoke-gh.cjs`) first on `PATH`. The stub serves one
 PR, its issue, and one marked `QA-01` checklist comment. It supports comment
 edits and bumps `updated_at` on each edit. Nothing goes to GitHub. It then
@@ -241,7 +241,7 @@ RALPH_CODEX_GATE_SMOKE=1 \
 ```
 
 The fixture matches the Claude test: a disposable git project, a linked
-`ralph-v2`, and the shared local `gh` stub with one `QA-01` comment. The
+`ralph`, and the shared local `gh` stub with one `QA-01` comment. The
 pending `runthrough-qa-checklist` step uses agent `codex`. During the run,
 `CODEX_BIN` points the gate's collector at
 `tests/probes/codex-gate-smoke-rpc.cjs`. That recorder forwards the real

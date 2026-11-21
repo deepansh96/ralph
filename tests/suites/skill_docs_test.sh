@@ -109,7 +109,7 @@ test_skills_bundle_is_self_contained_and_readme_documents_workflow() {
   node --check "$ROOT_DIR/skills/quiz-grilling/assets/app.js"
 
   readme="$ROOT_DIR/README.md"
-  [[ -f "$readme" ]] || fail "expected ralph-v2 README"
+  [[ -f "$readme" ]] || fail "expected ralph README"
   assert_contains "$(<"$readme")" "ralph.sh --issue N"
   assert_contains "$(<"$readme")" "ralph.sh status --issue N"
   assert_contains "$(<"$readme")" "ralph.sh logs --issue N"

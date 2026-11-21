@@ -1,6 +1,6 @@
 ---
 name: conventions
-description: How code, prompts, tests, and docs are written in Ralph v2. Load when editing or reviewing repository changes.
+description: How code, prompts, tests, and docs are written in Ralph. Load when editing or reviewing repository changes.
 triggers:
   - "convention"
   - "pattern"

@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: How Ralph v2 pipeline pieces connect and flow. Load when working on system design, integrations, prompt dispatch, or state behavior.
+description: How Ralph pipeline pieces connect and flow. Load when working on system design, integrations, prompt dispatch, or state behavior.
 triggers:
   - "architecture"
   - "pipeline"
@@ -17,7 +17,7 @@ edges:
     condition: when editing scripts, prompts, tests, or docs in this architecture
   - target: patterns/run-and-monitor-pipeline.md
     condition: when executing or observing a live pipeline
-last_updated: 2026-09-27
+last_updated: 2026-11-21
 ---
 
 # Architecture
@@ -40,7 +40,7 @@ The pipeline is issue-driven and state-driven. `ralph.sh` does not infer missing
 - **`scripts/delegation-gate.sh`** - runner completion gate for steps with `delegation` metadata: fails closed before launch on unsupported provider/metadata/settings, stamps a fresh attempt and rerenders inputs per provider invocation (existing retry limit/backoff), runs Claude with a session-local `ralph-worker`, hooks, and a known session, collects attempt-bound evidence, writes the manifest, and completes only at `OBSERVED`/`VERIFIED`. Blocked runs write no manifest. The opt-in live smoke tests `tests/probes/claude-gate-smoke.sh` and `tests/probes/codex-gate-smoke.sh` prove the real Claude and Codex paths end to end. See `docs/delegation-gate.md`.
 - **`scripts/state.sh`** - state access and mutation layer; validates failed/stale steps, selects pending or blocked steps, defers `alwaysRun` cleanup behind normal work while prioritizing it after failure, rearms completed cleanup when normal work is retried, appends dynamic steps, snapshots missing delegated-step defaults without overwriting explicit values, backfills delegation metadata on pending steps only, and writes PID files.
 - **`scripts/agent.sh`** - execution adapter for `claude`, `codex`, and `deepseek`; maps optional per-step model and `reasoningEffort` overrides to Claude, Codex, or Pi CLI flags, exposes single-invocation Claude/Codex command builders shared with the gate, then wraps retries, logging, working directory handling, and metrics extraction.
-- **`scripts/prompt.sh`** - renders prompt templates by replacing `{{ISSUE}}`, `{{REPO}}`, `{{WORKSPACE}}`, `{{BRANCH}}`, `{{BASE_BRANCH}}`, `{{STEP_ID}}`, `{{SUB_ISSUE}}`, `{{SKILLS_DIR}}`, `{{REVIEWERS}}`, and `{{AGENT}}`. Templates that request `{{NATIVE_DELEGATION_CONTRACT}}` receive the matching reusable Claude or Codex prompt fragment; Claude selects foreground Agent instructions only when delegation metadata is present, retaining Workflow for legacy steps. Worker model and effort resolve from per-step `subagentModel` / `subagentReasoningEffort` overrides, then `ralph.config.json` provider defaults; rendering fails when the provider or required settings are missing.
+- **`scripts/prompt.sh`** - renders prompt templates by replacing `{{ISSUE}}`, `{{REPO}}`, `{{WORKSPACE}}`, `{{BRANCH}}`, `{{BASE_BRANCH}}`, `{{STEP_ID}}`, `{{SUB_ISSUE}}`, `{{SKILLS_DIR}}`, `{{REVIEWERS}}`, `{{AGENT}}`, and `{{RALPH_DIR}}`. Templates that request `{{NATIVE_DELEGATION_CONTRACT}}` receive the matching reusable Claude or Codex prompt fragment; Claude selects foreground Agent instructions only when delegation metadata is present, retaining Workflow for legacy steps. Worker model and effort resolve from per-step `subagentModel` / `subagentReasoningEffort` overrides, then `ralph.config.json` provider defaults; rendering fails when the provider or required settings are missing.
 - **`ralph.config.json`** - repo-wide defaults for delegated parent and worker execution. Codex parents default to Sol/medium with Luna/max workers; Claude parents default to Opus/medium with Sonnet/high workers. Preflight snapshots these settings into new delegated steps; individual state steps may override them.
 - **`prompts/`** - one markdown contract per step type; downstream agents initialize workspaces, plan, implement, check, create the PR, prepare/run local QA, consolidate five review passes across four skills, and clean local resources. QA and PR review leave flat worker orchestration to their main agent while the provider fragment pins supported worker settings. Preflight backfills missing cleanup artifacts for older initialized workspaces.
 - **`skills/`** - bundled task guidance includes planning/TDD/domain skills plus `matt-pocock-code-review`, `ponytail-review`, `run-codex-review`, and `supe-review-code-changes`; grilling asks dependency-ordered question rounds; `quiz-grilling` can present those rounds through a disposable local web app and temporary tunnel; Wayfinder uses decision tickets and may fan out read-only research subagents while the parent owns all writes; `writing-for-agents`, `codebase-design`, `improve-codebase-architecture`, `prototype`, `wizard`, and `wait-what` are optional support outside the fixed pipeline. Prompt references stay inside the repository. Tracker operations live in `docs/agents/issue-tracker.md`, referenced from `AGENTS.md`.

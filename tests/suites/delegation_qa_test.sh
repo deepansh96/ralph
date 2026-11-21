@@ -91,7 +91,7 @@ mkdir -p "$tmp/bin" "$tmp/comments" "$tmp/workspace"
 cat > "$tmp/bin/gh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FAKE_GH_LOG"
-[[ "$1" == api && "$2" =~ ^repos/deepansh96/ralphV2/issues/comments/([0-9]+)$ ]] || exit 1
+[[ "$1" == api && "$2" =~ ^repos/deepansh96/ralph/issues/comments/([0-9]+)$ ]] || exit 1
 cat "$FAKE_GH_COMMENTS/${BASH_REMATCH[1]}.json" 2>/dev/null
 SH
 chmod +x "$tmp/bin/gh"
@@ -99,11 +99,11 @@ export PATH="$tmp/bin:$PATH" FAKE_GH_LOG="$tmp/gh.log" FAKE_GH_COMMENTS="$tmp/co
 comment() { jq -n --arg body "$2" --arg at "$3" --argjson id "$1" '{id:$id,node_id:"IC_x",html_url:"https://example.invalid",user:{login:"ralph"},updated_at:$at,body:$body}' > "$tmp/comments/$1.json"; }
 comment 123 "$before" 2026-08-25T10:00:00Z
 
-[[ "$(delegation_qa_checklist_fetch deepansh96/ralphV2 123 | jq -c '[.commentId,.updatedAt,(.items|length)]')" == '["123","2026-08-25T10:00:00Z",3]' ]] || fail 'fetch'
-set +e; delegation_qa_checklist_fetch deepansh96/ralphV2 999 >/dev/null 2>&1; status=$?; set -e
+[[ "$(delegation_qa_checklist_fetch deepansh96/ralph 123 | jq -c '[.commentId,.updatedAt,(.items|length)]')" == '["123","2026-08-25T10:00:00Z",3]' ]] || fail 'fetch'
+set +e; delegation_qa_checklist_fetch deepansh96/ralph 999 >/dev/null 2>&1; status=$?; set -e
 [[ "$status" == 1 ]] || fail "deleted comment status $status"
 comment 124 "$(sed 's/QA-02:/QA-01:/' <<< "$before")" 2026-08-25T10:00:00Z
-set +e; delegation_qa_checklist_fetch deepansh96/ralphV2 124 >/dev/null 2>&1; status=$?; set -e
+set +e; delegation_qa_checklist_fetch deepansh96/ralph 124 >/dev/null 2>&1; status=$?; set -e
 [[ "$status" == 2 ]] || fail "duplicated IDs status $status"
 
 # The parent writes the exact #37 plan before its first spawn: 0600, atomic,
@@ -112,7 +112,7 @@ state="$tmp/workspace/state.json"
 jq -n '{issue:37,steps:[{id:"runthrough-qa-checklist",status:"in_progress",delegation:{schemaVersion:1,policy:"qa-v1"},delegationAttempt:{id:"attempt-1",startedAt:1787590000}}]}' > "$state"
 assignments='[{"taskId":"qa_group_2","checklistItemIds":["QA-03"]},{"taskId":"qa_group_1","checklistItemIds":["QA-02","QA-01"]}]'
 expected_plan='{"schemaVersion":1,"stepId":"runthrough-qa-checklist","attemptId":"attempt-1","checklist":{"commentId":"123","updatedAt":"2026-08-25T10:00:00Z","digest":"sha256:824b66dc868ec8f188c2d5f4720e3f7f6bdf2830fbfa9c3b226f08f4b067fd4a","items":[{"id":"QA-01","text":"First check instruction"},{"id":"QA-02","text":"Second check instruction"},{"id":"QA-03","text":"Status prints one summary\n  - Setup: Seed workspace 9001.\n  - Action: Run `./ralph.sh status --issue 9001`.\n  - Expected: One `Delegation:` line.\n  - Isolation: Local files only."}]},"assignments":[{"taskId":"qa_group_1","checklistItemIds":["QA-01","QA-02"],"assignmentDigest":"sha256:20c0036e0e890c2de1d1b4ee23aa561cb6f6436ab765f0e0c25d60b8f5c73fb7"},{"taskId":"qa_group_2","checklistItemIds":["QA-03"],"assignmentDigest":"sha256:098e8207f52e1930ba93995117125feec37564a64babac664e2a3d1c5024bef2"}]}'
-[[ "$(delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralphV2 123 <<< "$assignments")" == "$expected_plan" ]] || fail 'plan output'
+[[ "$(delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralph 123 <<< "$assignments")" == "$expected_plan" ]] || fail 'plan output'
 plan_file="$tmp/workspace/delegation/runthrough-qa-checklist.plan.json"
 [[ "$(cat "$plan_file")" == "$expected_plan" ]] || fail 'plan file'
 node -e 'const fs=require("fs");if((fs.statSync(process.argv[1]).mode&0o777)!==0o600)process.exit(1)' "$plan_file" || fail 'plan mode'
@@ -124,18 +124,18 @@ for bad in '[{"taskId":"qa_group_1","checklistItemIds":["QA-01","QA-02"]}]' \
   '[{"taskId":"qa_group_1","checklistItemIds":["QA-01","QA-02","QA-03","QA-09"]}]' \
   '[{"taskId":"qa_group_1","checklistItemIds":["QA-01"]},{"taskId":"qa_group_1","checklistItemIds":["QA-02","QA-03"]}]' \
   '[{"taskId":"qa_group_1","checklistItemIds":["QA-01","QA-02","QA-03"],"prompt":"SECRET"}]'; do
-  rejects delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralphV2 123 <<< "$bad"
+  rejects delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralph 123 <<< "$bad"
 done
 [[ "$(cat "$plan_file")" == "$expected_plan" ]] || fail 'plan replaced by rejected input'
-rejects delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralphV2 999 <<< "$assignments"
+rejects delegation_qa_plan_write "$state" runthrough-qa-checklist deepansh96/ralph 999 <<< "$assignments"
 
 # qa-v1 verification. The runner refetches the plan's exact commentId; the
 # parent's later progress edits change updatedAt, tags, results, evidence, and
 # summary but not instructions, so they pass.
 comment 123 "$after" 2026-08-25T11:30:00Z
 : > "$FAKE_GH_LOG"
-qa="$(delegation_qa_verification "$plan_file" deepansh96/ralphV2)"
-[[ "$(cat "$FAKE_GH_LOG")" == 'api repos/deepansh96/ralphV2/issues/comments/123' ]] || fail 'refetch must use the exact plan commentId'
+qa="$(delegation_qa_verification "$plan_file" deepansh96/ralph)"
+[[ "$(cat "$FAKE_GH_LOG")" == 'api repos/deepansh96/ralph/issues/comments/123' ]] || fail 'refetch must use the exact plan commentId'
 [[ "$(jq -c '.checklist | [.commentId,.status,(.items|length)]' <<< "$qa")" == '["123","ok",3]' ]] || fail 'refetch facts'
 g1=sha256:20c0036e0e890c2de1d1b4ee23aa561cb6f6436ab765f0e0c25d60b8f5c73fb7
 g2=sha256:098e8207f52e1930ba93995117125feec37564a64babac664e2a3d1c5024bef2
@@ -156,9 +156,9 @@ summary() { qa_request "$1" "$2" | delegation_manifest_build | jq -c '[.evidence
 with_plan() { jq -c --argjson plan "$1" '.plan = $plan' <<< "$qa"; }
 plan="$(cat "$plan_file")"
 # Missing or structurally invalid plans.
-[[ "$(summary "$two" "$(delegation_qa_verification "$tmp/absent.plan.json" deepansh96/ralphV2)")" == '["UNVERIFIED",["PLAN_MISSING"],0,2,2,2]' ]] || fail 'missing plan'
+[[ "$(summary "$two" "$(delegation_qa_verification "$tmp/absent.plan.json" deepansh96/ralph)")" == '["UNVERIFIED",["PLAN_MISSING"],0,2,2,2]' ]] || fail 'missing plan'
 printf 'not json' > "$tmp/broken.plan.json"
-[[ "$(codes "$two" "$(delegation_qa_verification "$tmp/broken.plan.json" deepansh96/ralphV2)")" == '["PLAN_INVALID"]' ]] || fail 'unparsable plan'
+[[ "$(codes "$two" "$(delegation_qa_verification "$tmp/broken.plan.json" deepansh96/ralph)")" == '["PLAN_INVALID"]' ]] || fail 'unparsable plan'
 for mutation in '.extra = 1' '.checklist.items[0].raw = "x"' '.assignments[0].prompt = "x"' '.schemaVersion = 2' \
   '.checklist.items[1].id = "QA-2"' '.checklist.items[1].id = "QA-01"' '.assignments[1].taskId = "qa_group_1"' \
   '.assignments[1].checklistItemIds = ["QA-03","QA-09"]' '.checklist.digest = "sha256:\("0" * 64)"' '.stepId = "multi-axis-pr-review"'; do
@@ -181,7 +181,7 @@ bad_digest="sha256:$(printf 'f%.0s' {1..64})"
 [[ "$(codes "$two" "$(with_plan "$(jq -c '.attemptId = "attempt-0"' <<< "$plan")")")" == '["ATTEMPT_MISMATCH"]' ]] || fail 'stale plan attempt'
 # Refetched checklist: instruction/ID edits, additions, and removals change it;
 # deletion or unreadable fails closed; malformed or duplicated is invalid.
-refetched() { comment 123 "$1" 2026-08-25T12:00:00Z; codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralphV2)"; }
+refetched() { comment 123 "$1" 2026-08-25T12:00:00Z; codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralph)"; }
 [[ "$(refetched "$(sed 's/Seed workspace 9001/Seed workspace 9002/' <<< "$after")")" == '["CHECKLIST_CHANGED"]' ]] || fail 'instruction edit'
 [[ "$(refetched "$(sed 's/QA-02: Second/QA-04: Second/' <<< "$after")")" == '["CHECKLIST_CHANGED"]' ]] || fail 'id edit'
 [[ "$(refetched "$(printf '%s\n- [ ] [PENDING] QA-04: Added\n' "$before")")" == '["CHECKLIST_CHANGED"]' ]] || fail 'addition'
@@ -189,9 +189,9 @@ refetched() { comment 123 "$1" 2026-08-25T12:00:00Z; codes "$two" "$(delegation_
 [[ "$(refetched "$(sed 's/QA-02:/QA-01:/' <<< "$after")")" == '["CHECKLIST_INVALID"]' ]] || fail 'duplicated ids'
 [[ "$(refetched "$(sed 's/<!-- ralph:qa-checklist -->//' <<< "$after")")" == '["CHECKLIST_INVALID"]' ]] || fail 'marker removed'
 rm "$tmp/comments/123.json"
-[[ "$(codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralphV2)")" == '["CHECKLIST_UNAVAILABLE"]' ]] || fail 'deleted comment'
+[[ "$(codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralph)")" == '["CHECKLIST_UNAVAILABLE"]' ]] || fail 'deleted comment'
 printf '{"id":123' > "$tmp/comments/123.json"
-[[ "$(codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralphV2)")" == '["CHECKLIST_UNAVAILABLE"]' ]] || fail 'unreadable comment'
+[[ "$(codes "$two" "$(delegation_qa_verification "$plan_file" deepansh96/ralph)")" == '["CHECKLIST_UNAVAILABLE"]' ]] || fail 'unreadable comment'
 comment 123 "$after" 2026-08-25T12:30:00Z
 # Children must prove the immutable assignment digest. Without replacements,
 # each assignment needs one successful direct run-1 worker.

@@ -1,20 +1,20 @@
-# Ralph v2
+# Ralph
 
-Ralph v2 is a GitHub issue-driven pipeline for planning, implementing, checking,
+Ralph is a GitHub issue-driven pipeline for planning, implementing, checking,
 opening a PR, running local QA, and reviewing one feature. It stores progress
 in a per-issue `state.json` file and runs each step with the agent assigned in
 that state.
 
 ## CLI
 
-Run commands from the repository root:
+Run commands from the repository root (examples assume the conventional `ralph/` install folder; the install directory name is not hardcoded, so any folder name works and existing `ralph-v2/` installs keep working):
 
 ```bash
-./ralph-v2/ralph.sh --issue N
-./ralph-v2/ralph.sh status --issue N
-./ralph-v2/ralph.sh logs --issue N
-./ralph-v2/ralph.sh logs --issue N --step <step-id>
-./ralph-v2/cleanup.sh <issue-number>
+./ralph/ralph.sh --issue N
+./ralph/ralph.sh status --issue N
+./ralph/ralph.sh logs --issue N
+./ralph/ralph.sh logs --issue N --step <step-id>
+./ralph/cleanup.sh <issue-number>
 ```
 
 - `ralph.sh --issue N` validates state and context, then runs pending steps until the pipeline finishes or blocks. After failure it skips normal work, runs pending always-run cleanup, and exits non-zero.
@@ -29,13 +29,13 @@ separate state step.
 ### Automated Grilling Sessions
 
 ```bash
-./ralph-v2/ralph.sh grill start --issue N --grilling-agent claude --answering-agent claude
-./ralph-v2/ralph.sh grill start --requirement-file PATH --grilling-agent claude --answering-agent claude \
+./ralph/ralph.sh grill start --issue N --grilling-agent claude --answering-agent claude
+./ralph/ralph.sh grill start --requirement-file PATH --grilling-agent claude --answering-agent claude \
   [--grilling-model M] [--grilling-effort E] [--answering-model M] [--answering-effort E]
-./ralph-v2/ralph.sh grill resume --id SESSION_ID
-./ralph-v2/ralph.sh grill status --id SESSION_ID
-./ralph-v2/ralph.sh grill logs --id SESSION_ID
-./ralph-v2/ralph.sh grill cleanup --id SESSION_ID
+./ralph/ralph.sh grill resume --id SESSION_ID
+./ralph/ralph.sh grill status --id SESSION_ID
+./ralph/ralph.sh grill logs --id SESSION_ID
+./ralph/ralph.sh grill cleanup --id SESSION_ID
 ```
 
 - `grill start` opens an opt-in Automated Grilling Session: a Grilling Agent and a separate Answering Agent, each in its own native Claude session or Codex thread. It needs exactly one of `--issue` or `--requirement-file`, and both agent flags (`codex|claude`, in any pairing). Omitted model/effort flags fall back to `agentDefaults` in `ralph.config.json`, and the resolved values are frozen in the record.
@@ -55,7 +55,7 @@ separate state step.
 To monitor a running pipeline, poll with sleep intervals rather than continuously:
 
 ```bash
-sleep 120 && ./ralph-v2/ralph.sh status --issue N 2>&1
+sleep 120 && ./ralph/ralph.sh status --issue N 2>&1
 ```
 
 ## Tests
@@ -77,11 +77,11 @@ Run specific suites by name:
 ## Workflow
 
 1. Grill the feature into a GitHub issue using the project context and decision workflow (`skills/grill-with-docs/`). For an effort too big or foggy for one grilling session, chart a wayfinder map first (`skills/wayfinder/`): a map issue with child decision tickets resolved one per session, except for read-only research subagents fanned out in parallel. The cleared map's destination decision issue enters Ralph at `init`, where `create-and-review-prd` performs the `to-spec` handoff. If grilling produces speculative `CONTEXT.md` or ADR changes, keep them on a pushed `grill/*` planning branch instead of committing them directly to `main`.
-2. Run the `init.md` prompt for that issue so an agent creates `ralph-v2/workspaces/<issue>/state.json`. By default, init skips review-decisions steps and PRD/slice council review rounds. Opt in with "with 1 review-decision round" or "with 1 review round on PRD".
+2. Run the `init.md` prompt for that issue so an agent creates `ralph/workspaces/<issue>/state.json`. By default, init skips review-decisions steps and PRD/slice council review rounds. Opt in with "with 1 review-decision round" or "with 1 review round on PRD".
 3. Set `.baseBranch` explicitly in `state.json` before preflight reaches branch creation. Use the branch that already contains the grilling context: usually `main` for accepted docs, or the pushed `grill/*` planning branch for speculative feature docs.
-4. Run `./ralph-v2/ralph.sh --issue N`.
+4. Run `./ralph/ralph.sh --issue N`.
 5. If a step blocks, answer the questions in `workspaces/<issue>/hitl-<step-id>.md`, then run the same command again.
-6. After the PR workflow completes, run `./ralph-v2/cleanup.sh <issue-number>`.
+6. After the PR workflow completes, run `./ralph/cleanup.sh <issue-number>`.
 
 Grilling asks every currently answerable question in a numbered round, then recomputes the next frontier from the answers. Ask for one question at a time when that cadence is easier to work through.
 
@@ -124,7 +124,7 @@ review-decisions (0-2 rounds, default 0)
 ## Configuration
 
 Repo-wide delegated parent and worker defaults live in
-`ralph-v2/ralph.config.json`:
+`ralph/ralph.config.json`:
 
 ```json
 {
@@ -166,7 +166,7 @@ Each issue has one workspace. Init creates both `state.json` and the empty
 `local-resources.json` ledger, including the fixed always-run cleanup step:
 
 ```text
-ralph-v2/workspaces/<issue-number>/
+ralph/workspaces/<issue-number>/
 ```
 
 The workspace contains `state.json`, logs, human-input flag files, and review artifacts.
@@ -298,7 +298,7 @@ run one real gated QA step end to end
 
 ## Bundled Skills
 
-`ralph-v2/skills/` contains pipeline and supporting skills:
+`ralph/skills/` contains pipeline and supporting skills:
 
 - `to-spec/` — turn grilled decisions into a spec/PRD (with testing seams)
 - `to-tickets/` — break a spec into tracer-bullet slices with blocking edges
@@ -322,4 +322,4 @@ run one real gated QA step end to end
 
 Tracker operations (sub-issues, native blocking edges, wayfinding operations) live in `docs/agents/issue-tracker.md`, referenced from the `Issue tracker` section of `AGENTS.md`.
 
-The bundle is self-contained. Skill references point at files inside `ralph-v2/skills/`, not at the user's global skill directory.
+The bundle is self-contained. Skill references point at files inside `ralph/skills/`, not at the user's global skill directory.

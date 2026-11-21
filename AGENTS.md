@@ -1,6 +1,6 @@
-# Ralph v2
+# Ralph
 
-Ralph v2 is a GitHub issue-driven pipeline that grills, plans, implements,
+Ralph is a GitHub issue-driven pipeline that grills, plans, implements,
 checks, opens a PR, runs local QA, reviews, and cleans local resources for one
 feature.
 
@@ -10,7 +10,7 @@ Read `.mex/ROUTER.md` before doing task work. Load only the context and patterns
 
 ## Non-Negotiables
 
-- Run Ralph commands from the project root, not from inside `ralph-v2/`.
+- Run Ralph commands from the project root, not from inside `ralph/`.
 - Never pipe `ralph.sh --issue N` through `head`, `tail`, or similar commands.
 - Treat `workspaces/<issue>/state.json` as the single source of truth.
 - Set `.baseBranch` explicitly before preflight.

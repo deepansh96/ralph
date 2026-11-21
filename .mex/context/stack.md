@@ -1,6 +1,6 @@
 ---
 name: stack
-description: Technology stack, tool choices, and version constraints for Ralph v2. Load when working with shell, jq, GitHub, Claude, Codex, Pi, council, or mex.
+description: Technology stack, tool choices, and version constraints for Ralph. Load when working with shell, jq, GitHub, Claude, Codex, Pi, council, or mex.
 triggers:
   - "library"
   - "dependency"
@@ -22,7 +22,7 @@ edges:
     condition: when installing or validating local command availability
   - target: patterns/change-pipeline-behavior.md
     condition: when a stack choice affects a new or changed pipeline step
-last_updated: 2026-09-27
+last_updated: 2026-11-21
 ---
 
 # Stack

@@ -35,7 +35,7 @@ On HITL resume:
 Call the standalone wrapper:
 
 ```bash
-./ralph-v2/scripts/council-review.sh --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
+"{{RALPH_DIR}}/scripts/council-review.sh" --only {{REVIEWERS}} "IMPORTANT: You are a reviewer. DO NOT modify any files, create branches, run tests, or make any changes to the codebase or config. Only read and analyze. Provide feedback as text output only.
 
 Review the decisions in GitHub issue {{ISSUE}} (repo {{REPO}}). Evaluate each decision against:
 1. DESIGN GAPS — Are any decisions missing that a developer would need before implementation? Are scope boundaries explicit?

@@ -75,9 +75,9 @@ git -C "$project" checkout -q -b "$branch"
 printf 'smoke value: %s\n' "$token" >> "$project/README.md"
 git -C "$project" commit -q -am 'Add the smoke value'
 git -C "$project" push -q -u origin "$branch"
-# The QA prompt sources ./ralph-v2 from the project root, as in an install.
-ln -s "$ROOT" "$project/ralph-v2"
-printf 'ralph-v2\n' >> "$project/.git/info/exclude"
+# The QA prompt sources ./ralph from the project root, as in an install.
+ln -s "$ROOT" "$project/ralph"
+printf '/ralph\n' >> "$project/.git/info/exclude"
 
 mkdir -p "$store" "$scratch/bin"
 jq -n --arg repo "$REPO" --argjson issue "$ISSUE" --arg project "$project" --arg branch "$branch" \

@@ -20,7 +20,7 @@ GRILL_SESSIONS=""
 REQUIREMENT_FILE=""
 
 # Builds a temporary target repository with a local bare remote and a Ralph
-# install at <repo>/ralph-v2 (symlinked to this checkout), plus fake claude,
+# install at <repo>/ralph (symlinked to this checkout), plus fake claude,
 # codex, uuidgen and gh on PATH. Both fake Agents read the same exchange
 # fixtures.
 setup_grill_repo() {
@@ -29,12 +29,12 @@ setup_grill_repo() {
 
   git init -q --bare -b main "$GRILL_TMP/remote.git"
   git init -q -b main "$GRILL_REPO"
-  mkdir -p "$GRILL_REPO/ralph-v2"
-  ln -s "$ROOT_DIR/ralph.sh" "$GRILL_REPO/ralph-v2/ralph.sh"
-  ln -s "$ROOT_DIR/scripts" "$GRILL_REPO/ralph-v2/scripts"
-  ln -s "$ROOT_DIR/prompts" "$GRILL_REPO/ralph-v2/prompts"
-  ln -s "$ROOT_DIR/skills" "$GRILL_REPO/ralph-v2/skills"
-  cp "$ROOT_DIR/ralph.config.json" "$GRILL_REPO/ralph-v2/ralph.config.json"
+  mkdir -p "$GRILL_REPO/ralph"
+  ln -s "$ROOT_DIR/ralph.sh" "$GRILL_REPO/ralph/ralph.sh"
+  ln -s "$ROOT_DIR/scripts" "$GRILL_REPO/ralph/scripts"
+  ln -s "$ROOT_DIR/prompts" "$GRILL_REPO/ralph/prompts"
+  ln -s "$ROOT_DIR/skills" "$GRILL_REPO/ralph/skills"
+  cp "$ROOT_DIR/ralph.config.json" "$GRILL_REPO/ralph/ralph.config.json"
   printf '# Target project\n' > "$GRILL_REPO/README.md"
   git -C "$GRILL_REPO" add -A
   git -C "$GRILL_REPO" commit -q -m "Initial commit"
@@ -42,8 +42,8 @@ setup_grill_repo() {
   git -C "$GRILL_REPO" push -q -u origin main
   git -C "$GRILL_REPO" remote set-head origin main
 
-  GRILL_RALPH="$GRILL_REPO/ralph-v2/ralph.sh"
-  GRILL_SESSIONS="$GRILL_REPO/ralph-v2/grilling-sessions"
+  GRILL_RALPH="$GRILL_REPO/ralph/ralph.sh"
+  GRILL_SESSIONS="$GRILL_REPO/ralph/grilling-sessions"
   REQUIREMENT_FILE="$GRILL_TMP/offline-export.md"
   printf '%s\n' "$REQUIREMENT_TEXT" > "$REQUIREMENT_FILE"
 
@@ -393,9 +393,9 @@ test_start_ignores_ralph_session_storage_in_dirty_check() {
 
   setup_grill_repo
   git -C "$GRILL_REPO" checkout -q -b feature-work
-  mkdir -p "$GRILL_SESSIONS/older-session" "$GRILL_REPO/ralph-v2/archive/grilling"
+  mkdir -p "$GRILL_SESSIONS/older-session" "$GRILL_REPO/ralph/archive/grilling"
   printf 'old\n' > "$GRILL_SESSIONS/older-session/session.json"
-  printf 'old\n' > "$GRILL_REPO/ralph-v2/archive/grilling/record.json"
+  printf 'old\n' > "$GRILL_REPO/ralph/archive/grilling/record.json"
 
   session_id="$(grill start --requirement-file "$REQUIREMENT_FILE" \
     --grilling-agent claude --answering-agent claude | tail -n 1)"
@@ -1063,7 +1063,7 @@ printf "stray\n" > src/app.txt'
 
 # Prints the archived session directory for a session ID, or nothing.
 archived_session_dir() {
-  find "$GRILL_REPO/ralph-v2/archive/grilling" -mindepth 1 -maxdepth 1 -type d -name "*-$1" 2>/dev/null | head -n 1
+  find "$GRILL_REPO/ralph/archive/grilling" -mindepth 1 -maxdepth 1 -type d -name "*-$1" 2>/dev/null | head -n 1
 }
 
 assert_archived() {
@@ -1223,7 +1223,7 @@ printf "# Target project\n\nEdited outside scope.\n" > README.md'
   [[ "$(<"$GRILL_REPO/CONTEXT.md")" == $'# Context\n\nOriginal glossary.' ]] || fail "expected CONTEXT.md restored"
   [[ ! -e "$GRILL_REPO/docs/adr/0001-use-postgres.md" ]] || fail "expected the new ADR removed"
   [[ "$(<"$GRILL_REPO/README.md")" == $'# Target project\n\nEdited outside scope.' ]] || fail "expected README.md untouched"
-  [[ "$(git -C "$GRILL_REPO" status --porcelain --untracked-files=all -- . ':(exclude)ralph-v2')" == " M README.md" ]] \
+  [[ "$(git -C "$GRILL_REPO" status --porcelain --untracked-files=all -- . ':(exclude)ralph')" == " M README.md" ]] \
     || fail "expected only the out-of-scope change left, got: $(git -C "$GRILL_REPO" status --porcelain)"
   [[ -z "$(gh_writes)" ]] || fail "expected no gh writes on reject"
   [[ "$(claude_call_count)" == "0" ]] || fail "expected no Agent calls during reject"
@@ -1318,7 +1318,7 @@ test_cleanup_deletes_terminal_sessions_and_refuses_active_ones() {
   local archive_dir status session_id n=0
 
   setup_grill_repo
-  archive_dir="$GRILL_REPO/ralph-v2/archive/grilling"
+  archive_dir="$GRILL_REPO/ralph/archive/grilling"
 
   write_fixture_session "$GRILL_SESSIONS/20260924-100000-0001" 20260924-100000-0001 failed
   write_fixture_session "$GRILL_SESSIONS/20260924-100000-0002" 20260924-100000-0002 context_lost
@@ -2467,7 +2467,7 @@ test_gate_works_when_ralph_session_storage_is_gitignored() {
 
   setup_grill_repo
   git -C "$GRILL_REPO" checkout -q -b feature-work
-  printf 'ralph-v2/grilling-sessions/\nralph-v2/archive/\n' >> "$GRILL_REPO/.git/info/exclude"
+  printf 'ralph/grilling-sessions/\nralph/archive/\n' >> "$GRILL_REPO/.git/info/exclude"
   queue_two_round_run
 
   grill start --requirement-file "$REQUIREMENT_FILE" --grilling-agent claude --answering-agent claude >/dev/null 2>&1

@@ -13,7 +13,10 @@ test_init_prompt_defines_complete_workspace_initialization_contract() {
 
   assert_contains "$prompt" "gh issue view {{ISSUE}} --repo {{REPO}}"
   assert_contains "$prompt" "command -v gh"
-  assert_contains "$prompt" "workspaces/{{ISSUE}}"
+  assert_contains "$prompt" 'Ralph directory (`<ralph-dir>`): the folder that contains this `prompts/init.md`'
+  assert_contains "$prompt" "<ralph-dir>/workspaces/{{ISSUE}}"
+  [[ "$prompt" != *'`ralph/workspaces/'* && "$prompt" != *'./ralph/ralph.sh'* ]] \
+    || fail "expected init prompt to use <ralph-dir> instead of a hardcoded ralph/ install path"
   assert_contains "$prompt" "must not overwrite"
   assert_contains "$prompt" '"baseBranch": null'
   assert_contains "$prompt" '"branch": null'
@@ -28,7 +31,7 @@ test_init_prompt_defines_complete_workspace_initialization_contract() {
   assert_contains "$prompt" '"type": "cleanup-local-resources"'
   assert_contains "$prompt" '"alwaysRun": true'
   assert_contains "$prompt" "local-resources.json"
-  assert_contains "$prompt" "ralph.sh status --issue {{ISSUE}}"
+  assert_contains "$prompt" "./<ralph-dir>/ralph.sh status --issue {{ISSUE}}"
   assert_contains "$prompt" '"projectRoot"'
   assert_contains "$prompt" "git rev-parse --show-toplevel"
   assert_contains "$prompt" "git status --porcelain"
@@ -132,7 +135,7 @@ test_review_decisions_prompt_defines_council_filtering_and_hitl_contract() {
   assert_contains "$prompt" "CONTEXT.md"
   assert_contains "$prompt" "CLAUDE.md"
   assert_contains "$prompt" "docs/adr"
-  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "\"{{RALPH_DIR}}/scripts/council-review.sh\""
   assert_contains "$prompt" "/tmp/ralph-{{ISSUE}}-issue-body.md"
   assert_contains "$prompt" "rm -f /tmp/ralph-{{ISSUE}}-issue-body.md"
   assert_contains "$prompt" "Major feedback"
@@ -165,7 +168,7 @@ test_create_prd_prompt_defines_full_prd_workflow_contract() {
   assert_contains "$prompt" "User Stories"
   assert_contains "$prompt" "Implementation Decisions"
   assert_contains "$prompt" "Testing Decisions"
-  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "\"{{RALPH_DIR}}/scripts/council-review.sh\""
   assert_contains "$prompt" "Round 1"
   assert_contains "$prompt" "Round 2"
   assert_contains "$prompt" "**0 (default):** Skip council review entirely"
@@ -199,7 +202,7 @@ test_create_slices_prompt_defines_full_slice_creation_contract() {
   assert_contains "$prompt" "delete edges no longer declared"
   assert_contains "$prompt" "expand"
   assert_contains "$prompt" "prefactor"
-  assert_contains "$prompt" "scripts/council-review.sh"
+  assert_contains "$prompt" "\"{{RALPH_DIR}}/scripts/council-review.sh\""
   assert_contains "$prompt" "Round 1"
   assert_contains "$prompt" "Round 2"
   assert_contains "$prompt" "**0 (default):** Skip council review entirely"
@@ -240,7 +243,10 @@ test_preflight_prompt_defines_full_preflight_workflow_contract() {
   assert_contains "$prompt" "prepare-qa-checklist"
   assert_contains "$prompt" "runthrough-qa-checklist"
   assert_contains "$prompt" "multi-axis-pr-review"
-  assert_contains "$prompt" "ralph.config.json"
+  assert_contains "$prompt" "source \"{{RALPH_DIR}}/scripts/state.sh\""
+  assert_contains "$prompt" "source \"{{RALPH_DIR}}/scripts/config.sh\""
+  assert_contains "$prompt" "{{RALPH_DIR}}/ralph.config.json"
+  assert_contains "$prompt" "\"{{RALPH_DIR}}/ralph.sh\" status --issue {{ISSUE}}"
   assert_contains "$prompt" "ralph_config_delegated_step_defaults"
   assert_contains "$prompt" "state_snapshot_delegated_step_defaults"
   assert_contains "$prompt" '"delegation": {"schemaVersion": 1, "policy": "pr-review-v1"}'
@@ -434,7 +440,7 @@ test_runthrough_qa_checklist_prompt_defines_execution_and_progress_contract() {
   # qa-v1 plan timing, packet markers, Codex task naming, progress format.
   assert_contains "$prompt" "Before the first spawn"
   assert_contains "$prompt" "delegation_qa_plan_write {{WORKSPACE}}/state.json {{STEP_ID}} {{REPO}} <comment-id>"
-  assert_contains "$prompt" "./ralph-v2/scripts/delegation-qa.sh"
+  assert_contains "$prompt" "source \"{{RALPH_DIR}}/scripts/delegation-qa.sh\""
   assert_contains "$prompt" "{{WORKSPACE}}/delegation/{{STEP_ID}}.plan.json"
   assert_contains "$prompt" "Never write, edit, or regenerate the plan"
   assert_contains "$prompt" "RALPH-TASK: <taskId>"
@@ -656,6 +662,68 @@ test_human_grilling_skills_carry_no_automated_grilling_contract() {
   done < <(find "$ROOT_DIR/skills/grill-with-docs" "$ROOT_DIR/skills/grilling" "$ROOT_DIR/skills/quiz-grilling" -type f)
 }
 
+test_rendered_step_prompts_resolve_ralph_dir_without_hardcoded_install_paths() {
+  local issue workspace state_file custom_root prompt stale_refs step_file source_line
+
+  issue="9087"
+  workspace="$WORKSPACES_DIR/$issue"
+  # A space and an "&" in the install path catch unquoted snippets and bash 5.2
+  # patsub_replacement expanding "&" during placeholder substitution.
+  custom_root="$workspace/R&D install/ralph-v2"
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  mkdir -p "$custom_root/prompts/native-delegation"
+  state_file="$workspace/state.json"
+  jq -n --arg issue "$issue" '{
+    issue: ($issue | tonumber),
+    repo: "deepansh96/ralph",
+    branch: "feat/issue-9087-ralph-dir",
+    baseBranch: "main"
+  }' > "$state_file"
+  cp "$ROOT_DIR/ralph.config.json" "$custom_root/ralph.config.json"
+  cp "$ROOT_DIR/prompts/native-delegation/codex.md" "$custom_root/prompts/native-delegation/codex.md"
+  for step_file in \
+    preflight.md \
+    runthrough-qa-checklist.md \
+    create-and-review-prd.md \
+    create-and-review-slices.md \
+    review-decisions.md; do
+    cp "$ROOT_DIR/prompts/$step_file" "$custom_root/prompts/$step_file"
+  done
+
+  source "$ROOT_DIR/scripts/prompt.sh"
+
+  prompt="$(prompt_render "$custom_root/prompts/preflight.md" "$state_file" "$workspace" '{"id":"preflight","agent":"codex"}' "$custom_root/skills")"
+  assert_contains "$prompt" "source \"$custom_root/scripts/state.sh\""
+  assert_contains "$prompt" "source \"$custom_root/scripts/config.sh\""
+  assert_contains "$prompt" "\"$custom_root/ralph.config.json\""
+  assert_contains "$prompt" "\"$custom_root/ralph.sh\" status --issue $issue"
+  [[ "$prompt" != *'{{RALPH_DIR}}'* ]] || fail "expected {{RALPH_DIR}} to be rendered in preflight prompt"
+  [[ "$prompt" != *'./ralph/'* ]] || fail "expected no hardcoded ./ralph/ path in rendered preflight prompt"
+
+  # The rendered snippet must run as-is from a path with a space and an "&".
+  mkdir -p "$custom_root/scripts"
+  printf 'RALPH_DIR_PROBE=sourced\n' > "$custom_root/scripts/state.sh"
+  source_line="$(grep -m1 '^source .*/scripts/state\.sh"$' <<< "$prompt")"
+  [[ -n "$source_line" ]] || fail "expected a rendered source line for state.sh"
+  [[ "$(bash -c "$source_line"' && printf %s "$RALPH_DIR_PROBE"')" == "sourced" ]] \
+    || fail "expected rendered source line to run from a path with spaces: $source_line"
+
+  prompt="$(prompt_render "$custom_root/prompts/runthrough-qa-checklist.md" "$state_file" "$workspace" '{"id":"runthrough-qa-checklist","agent":"codex"}' "$custom_root/skills")"
+  assert_contains "$prompt" "source \"$custom_root/scripts/delegation-qa.sh\""
+  [[ "$prompt" != *'{{RALPH_DIR}}'* ]] || fail "expected {{RALPH_DIR}} to be rendered in runthrough-qa-checklist prompt"
+  [[ "$prompt" != *'./ralph/'* ]] || fail "expected no hardcoded ./ralph/ path in rendered runthrough-qa-checklist prompt"
+
+  for step_file in review-decisions.md create-and-review-prd.md create-and-review-slices.md; do
+    prompt="$(prompt_render "$custom_root/prompts/$step_file" "$state_file" "$workspace" '{"id":"review-step","agent":"codex","reviewers":["codex"]}' "$custom_root/skills")"
+    assert_contains "$prompt" "\"$custom_root/scripts/council-review.sh\" --only codex"
+    [[ "$prompt" != *'{{RALPH_DIR}}'* ]] || fail "expected {{RALPH_DIR}} to be rendered in $step_file"
+    [[ "$prompt" != *'./ralph/'* ]] || fail "expected no hardcoded ./ralph/ path in rendered $step_file"
+  done
+
+  stale_refs="$(grep -Rn "ralph-v2" "$ROOT_DIR/prompts" 2>/dev/null || true)"
+  [[ -z "$stale_refs" ]] || fail "expected no ralph-v2 install path references in prompts/: $stale_refs"
+}
+
 run_test test_init_prompt_defines_complete_workspace_initialization_contract
 run_test test_initialized_workspace_status_shows_default_four_pending_fixed_steps
 run_test test_review_decisions_prompt_defines_council_filtering_and_hitl_contract
@@ -678,5 +746,6 @@ run_test test_session_start_fragment_carries_exchange_marker_and_requirement
 run_test test_exchange_fragments_carry_exchange_marker_and_json_only_reply
 run_test test_grill_message_schemas_are_checked_in
 run_test test_human_grilling_skills_carry_no_automated_grilling_contract
+run_test test_rendered_step_prompts_resolve_ralph_dir_without_hardcoded_install_paths
 
 echo "prompt_contracts_test.sh passed"

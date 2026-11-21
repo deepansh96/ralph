@@ -1,6 +1,6 @@
 ---
 name: decisions
-description: Key Ralph v2 architectural and workflow decisions with reasoning. Load when changing pipeline policy or understanding why behavior exists.
+description: Key Ralph architectural and workflow decisions with reasoning. Load when changing pipeline policy or understanding why behavior exists.
 triggers:
   - "why do we"
   - "decision"
@@ -18,7 +18,7 @@ edges:
     condition: when a decision affects live run behavior
   - target: patterns/initialize-issue-workspace.md
     condition: when a decision affects init or branch contracts
-last_updated: 2026-09-27
+last_updated: 2026-11-21
 ---
 
 # Decisions

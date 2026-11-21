@@ -1,6 +1,6 @@
 ---
 name: router
-description: Session bootstrap and navigation hub for Ralph v2. Read at the start of every session before any task.
+description: Session bootstrap and navigation hub for Ralph. Read at the start of every session before any task.
 edges:
   - target: context/architecture.md
     condition: when working on pipeline flow, prompt dispatch, state transitions, or integrations
@@ -14,7 +14,7 @@ edges:
     condition: when setting up the repo, running tests, or debugging environment issues
   - target: patterns/INDEX.md
     condition: when starting a concrete task, especially init, run, recovery, or pipeline changes
-last_updated: 2026-09-27
+last_updated: 2026-11-21
 ---
 
 # Session Bootstrap

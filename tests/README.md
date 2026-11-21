@@ -1,4 +1,4 @@
-# Ralph v2 Test Suite
+# Ralph Test Suite
 
 Run the full suite from the repository root:
 

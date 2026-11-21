@@ -68,7 +68,7 @@ were produced independently with `shasum -a 256`.
 Before its first spawn the QA parent runs:
 
 ```bash
-source ./ralph-v2/scripts/delegation-qa.sh
+source ./ralph/scripts/delegation-qa.sh
 delegation_qa_plan_write <workspace>/state.json runthrough-qa-checklist <owner/repo> <comment-id> <<< '<assignments JSON>'
 ```
 

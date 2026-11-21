@@ -26,7 +26,18 @@ test_runner_errors_for_unknown_suite() {
   assert_contains "$output" "does_not_exist_test.sh"
 }
 
+test_legacy_wrapper_delegates_to_runner() {
+  local output
+
+  output="$("$ROOT_DIR/tests/test_ralph_v2.sh" parse_log)"
+
+  assert_contains "$output" "==> parse_log_test.sh"
+  assert_contains "$output" "parse_log_test.sh passed"
+  [[ "$output" != *"==> cli_test.sh"* ]] || fail "expected legacy wrapper named suite run not to execute cli suite"
+}
+
 run_test test_runner_runs_named_suite_only
 run_test test_runner_errors_for_unknown_suite
+run_test test_legacy_wrapper_delegates_to_runner
 
 echo "runner_test.sh passed"

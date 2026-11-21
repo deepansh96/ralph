@@ -1,6 +1,6 @@
 ---
 name: conventions
-description: How code, prompts, tests, and docs are written in Ralph v2. Load when editing or reviewing repository changes.
+description: How code, prompts, tests, and docs are written in Ralph. Load when editing or reviewing repository changes.
 triggers:
   - "convention"
   - "pattern"
@@ -18,7 +18,7 @@ edges:
     condition: when editing a step prompt, script helper, or test suite
   - target: patterns/recover-failed-or-stale-step.md
     condition: when changing state recovery or PID behavior
-last_updated: 2026-07-30
+last_updated: 2026-11-21
 ---
 
 # Conventions

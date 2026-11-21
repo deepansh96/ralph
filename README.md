@@ -7,7 +7,7 @@ that state.
 
 ## CLI
 
-Run commands from the repository root:
+Run commands from the repository root (examples assume the conventional `ralph/` install folder; the install directory name is not hardcoded, so any folder name works and existing `ralph-v2/` installs keep working):
 
 ```bash
 ./ralph/ralph.sh --issue N

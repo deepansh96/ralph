@@ -34,7 +34,7 @@ unique snake_case task ID such as `qa_group_1`. Before the first spawn,
 snapshot the checklist and write the plan from the project root:
 
 ```bash
-source ./ralph/scripts/delegation-qa.sh
+source {{RALPH_DIR}}/scripts/delegation-qa.sh
 delegation_qa_plan_write {{WORKSPACE}}/state.json {{STEP_ID}} {{REPO}} <comment-id> <<'JSON'
 [{"taskId":"qa_group_1","checklistItemIds":["QA-01","QA-02"]},{"taskId":"qa_group_2","checklistItemIds":["QA-03"]}]
 JSON

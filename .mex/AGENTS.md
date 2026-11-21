@@ -1,7 +1,7 @@
 ---
 name: agents
 description: Always-loaded project anchor for Ralph. Read this first, then load ROUTER.md for task-specific context.
-last_updated: 2026-07-09
+last_updated: 2026-11-21
 ---
 
 # Ralph

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 
 STATE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=ralph/scripts/config.sh
+# shellcheck source=config.sh
 source "$STATE_SCRIPT_DIR/config.sh"
+# shellcheck source=delegation.sh
 source "$STATE_SCRIPT_DIR/delegation.sh"
 
 state_read() {

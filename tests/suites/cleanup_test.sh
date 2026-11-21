@@ -97,10 +97,63 @@ test_cleanup_removes_empty_workspaces_directory() {
   assert_contains "$output" "$destination"
 }
 
+test_cleanup_falls_back_to_legacy_workspaces_dir_env_var() {
+  local issue date destination output legacy_workspaces
+
+  issue="9085"
+  date="$(date +%Y-%m-%d)"
+  destination="$ARCHIVE_DIR/$date-$issue"
+  legacy_workspaces="$(mktemp -d "${WORKSPACES_DIR}.legacy.XXXXXX")"
+  rm -rf "$destination"
+  mkdir -p "$legacy_workspaces/$issue"
+  printf "legacy-state\n" > "$legacy_workspaces/$issue/state.json"
+
+  output="$(
+    unset RALPH_WORKSPACES_DIR
+    RALPH_V2_WORKSPACES_DIR="$legacy_workspaces" "$CLEANUP_SCRIPT" "$issue"
+  )"
+
+  [[ -d "$destination" ]] || fail "expected archived workspace from RALPH_V2_WORKSPACES_DIR"
+  [[ "$(<"$destination/state.json")" == "legacy-state" ]] || fail "expected legacy workspace state.json to be archived"
+  [[ ! -d "$legacy_workspaces" ]] || fail "expected empty legacy workspaces directory to be removed"
+  assert_contains "$output" "$legacy_workspaces/$issue"
+  assert_contains "$output" "$destination"
+}
+
+test_cleanup_prefers_ralph_workspaces_dir_over_legacy_env_var() {
+  local issue date destination output new_workspaces legacy_workspaces
+
+  issue="9086"
+  date="$(date +%Y-%m-%d)"
+  destination="$ARCHIVE_DIR/$date-$issue"
+  new_workspaces="$(mktemp -d "${WORKSPACES_DIR}.new.XXXXXX")"
+  legacy_workspaces="$(mktemp -d "${WORKSPACES_DIR}.legacy.XXXXXX")"
+  rm -rf "$destination"
+  mkdir -p "$new_workspaces/$issue" "$legacy_workspaces/$issue"
+  printf "new-state\n" > "$new_workspaces/$issue/state.json"
+  printf "legacy-state\n" > "$legacy_workspaces/$issue/state.json"
+
+  output="$(
+    RALPH_WORKSPACES_DIR="$new_workspaces" \
+      RALPH_V2_WORKSPACES_DIR="$legacy_workspaces" \
+      "$CLEANUP_SCRIPT" "$issue"
+  )"
+
+  [[ -d "$destination" ]] || fail "expected archived workspace from RALPH_WORKSPACES_DIR"
+  [[ "$(<"$destination/state.json")" == "new-state" ]] || fail "expected RALPH_WORKSPACES_DIR to take precedence over RALPH_V2_WORKSPACES_DIR"
+  [[ ! -d "$new_workspaces" ]] || fail "expected empty new workspaces directory to be removed"
+  [[ -f "$legacy_workspaces/$issue/state.json" ]] || fail "expected legacy workspace to remain untouched"
+  assert_contains "$output" "$new_workspaces/$issue"
+  assert_contains "$output" "$destination"
+  rm -rf "$legacy_workspaces"
+}
+
 run_test test_cleanup_archives_workspace_by_issue_number
 run_test test_cleanup_errors_when_workspace_is_missing
 run_test test_cleanup_errors_when_archive_destination_exists
 run_test test_cleanup_validates_issue_number
 run_test test_cleanup_removes_empty_workspaces_directory
+run_test test_cleanup_falls_back_to_legacy_workspaces_dir_env_var
+run_test test_cleanup_prefers_ralph_workspaces_dir_over_legacy_env_var
 
 echo "cleanup_test.sh passed"

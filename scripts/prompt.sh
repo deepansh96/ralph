@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 
 PROMPT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=ralph/scripts/config.sh
+# shellcheck source=config.sh
 source "$PROMPT_SCRIPT_DIR/config.sh"
 
 prompt_native_delegation_contract() {
@@ -58,7 +59,7 @@ prompt_render() {
 
   prompt="$(<"$template_file")"
 
-  local issue repo branch base_branch step_id sub_issue reviewers agent
+  local issue repo branch base_branch step_id sub_issue reviewers agent ralph_dir
   local native_delegation_contract
   issue="$(jq -r '.issue // ""' "$state_file")"
   repo="$(jq -r '.repo // ""' "$state_file")"
@@ -68,6 +69,7 @@ prompt_render() {
   sub_issue="$(jq -r '.sub_issue // .subIssue // ""' <<<"$step_json")"
   reviewers="$(jq -r '(.reviewers // []) | join(",")' <<<"$step_json")"
   agent="$(jq -r '.agent // ""' <<<"$step_json")"
+  ralph_dir="$(cd "$(dirname "$template_file")/.." && pwd)"
 
   prompt="${prompt//\{\{ISSUE\}\}/$issue}"
   prompt="${prompt//\{\{REPO\}\}/$repo}"
@@ -79,6 +81,7 @@ prompt_render() {
   prompt="${prompt//\{\{SKILLS_DIR\}\}/$skills_dir}"
   prompt="${prompt//\{\{REVIEWERS\}\}/$reviewers}"
   prompt="${prompt//\{\{AGENT\}\}/$agent}"
+  prompt="${prompt//\{\{RALPH_DIR\}\}/$ralph_dir}"
 
   if [[ "$prompt" == *'{{NATIVE_DELEGATION_CONTRACT}}'* ]]; then
     if ! native_delegation_contract="$(prompt_native_delegation_contract "$template_file" "$agent" "$step_json")"; then

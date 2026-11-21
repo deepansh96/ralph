@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
 
 # Grill coordinator: the `ralph.sh grill` command family. It is the only
 # component that writes the Grilling Session Record, runs Git writes, or calls
 # gh writes. Agents are reached only through the session adapters.
 
 GRILL_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=ralph/scripts/grill-record.sh
+# shellcheck source=grill-record.sh
 source "$GRILL_SCRIPT_DIR/grill-record.sh"
-# shellcheck source=ralph/scripts/grill-adapters.sh
+# shellcheck source=grill-adapters.sh
 source "$GRILL_SCRIPT_DIR/grill-adapters.sh"
 
 grill_usage() {

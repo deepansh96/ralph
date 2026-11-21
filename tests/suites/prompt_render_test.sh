@@ -33,6 +33,7 @@ Sub={{SUB_ISSUE}}
 Skills={{SKILLS_DIR}}
 Reviewers={{REVIEWERS}}
 Agent={{AGENT}}
+RalphDir={{RALPH_DIR}}
 TEMPLATE
 
   source "$ROOT_DIR/scripts/prompt.sh"
@@ -55,6 +56,7 @@ TEMPLATE
   assert_contains "$prompt" "Skills=$ROOT_DIR/skills"
   assert_contains "$prompt" "Reviewers=codex,gemini"
   assert_contains "$prompt" "Agent=codex"
+  assert_contains "$prompt" "RalphDir=$WORKSPACES_DIR"
 }
 
 test_prompt_render_fails_when_template_is_missing() {

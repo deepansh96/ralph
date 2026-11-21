@@ -64,7 +64,7 @@ git -C "$project" commit -q -am 'Add the smoke value'
 git -C "$project" push -q -u origin "$branch"
 # The QA prompt sources ./ralph from the project root, as in an install.
 ln -s "$ROOT" "$project/ralph"
-printf 'ralph\n' >> "$project/.git/info/exclude"
+printf '/ralph\n' >> "$project/.git/info/exclude"
 
 mkdir -p "$store" "$scratch/bin"
 jq -n --arg repo "$REPO" --argjson issue "$ISSUE" --arg project "$project" --arg branch "$branch" \

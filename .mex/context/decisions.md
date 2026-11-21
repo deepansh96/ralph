@@ -18,7 +18,7 @@ edges:
     condition: when a decision affects live run behavior
   - target: patterns/initialize-issue-workspace.md
     condition: when a decision affects init or branch contracts
-last_updated: 2026-09-27
+last_updated: 2026-11-21
 ---
 
 # Decisions

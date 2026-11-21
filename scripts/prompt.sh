@@ -5,11 +5,28 @@ PROMPT_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=config.sh
 source "$PROMPT_SCRIPT_DIR/config.sh"
 
+# Replace every {{NAME}} in the caller's $prompt with VALUE, inserted literally.
+# ${prompt//pattern/$value} is not used because bash 5.2's patsub_replacement
+# expands "&" in VALUE to the matched text, and quoting VALUE instead leaves
+# literal quotes behind on bash 3.2.
+prompt_substitute() {
+  local token="{{$1}}"
+  local value="$2"
+  local rest="$prompt"
+  local out=""
+
+  while [[ "$rest" == *"$token"* ]]; do
+    out+="${rest%%"$token"*}$value"
+    rest="${rest#*"$token"}"
+  done
+  prompt="$out$rest"
+}
+
 prompt_native_delegation_contract() {
   local template_file="$1"
   local agent="$2"
   local step_json="$3"
-  local contract_file config_file ralph_root contract defaults
+  local contract_file config_file ralph_root defaults prompt
   local subagent_model subagent_reasoning_effort
 
   contract_file="$(dirname "$template_file")/native-delegation/$agent.md"
@@ -37,11 +54,11 @@ prompt_native_delegation_contract() {
     subagent_reasoning_effort="$(jq -r '.reasoningEffort' <<<"$defaults")"
   fi
 
-  contract="$(<"$contract_file")"
-  contract="${contract//\{\{SUBAGENT_MODEL\}\}/$subagent_model}"
-  contract="${contract//\{\{SUBAGENT_REASONING_EFFORT\}\}/$subagent_reasoning_effort}"
+  prompt="$(<"$contract_file")"
+  prompt_substitute SUBAGENT_MODEL "$subagent_model"
+  prompt_substitute SUBAGENT_REASONING_EFFORT "$subagent_reasoning_effort"
 
-  printf '%s\n' "$contract"
+  printf '%s\n' "$prompt"
 }
 
 prompt_render() {
@@ -71,23 +88,23 @@ prompt_render() {
   agent="$(jq -r '.agent // ""' <<<"$step_json")"
   ralph_dir="$(cd "$(dirname "$template_file")/.." && pwd)"
 
-  prompt="${prompt//\{\{ISSUE\}\}/$issue}"
-  prompt="${prompt//\{\{REPO\}\}/$repo}"
-  prompt="${prompt//\{\{WORKSPACE\}\}/$workspace}"
-  prompt="${prompt//\{\{BRANCH\}\}/$branch}"
-  prompt="${prompt//\{\{BASE_BRANCH\}\}/$base_branch}"
-  prompt="${prompt//\{\{STEP_ID\}\}/$step_id}"
-  prompt="${prompt//\{\{SUB_ISSUE\}\}/$sub_issue}"
-  prompt="${prompt//\{\{SKILLS_DIR\}\}/$skills_dir}"
-  prompt="${prompt//\{\{REVIEWERS\}\}/$reviewers}"
-  prompt="${prompt//\{\{AGENT\}\}/$agent}"
-  prompt="${prompt//\{\{RALPH_DIR\}\}/$ralph_dir}"
+  prompt_substitute ISSUE "$issue"
+  prompt_substitute REPO "$repo"
+  prompt_substitute WORKSPACE "$workspace"
+  prompt_substitute BRANCH "$branch"
+  prompt_substitute BASE_BRANCH "$base_branch"
+  prompt_substitute STEP_ID "$step_id"
+  prompt_substitute SUB_ISSUE "$sub_issue"
+  prompt_substitute SKILLS_DIR "$skills_dir"
+  prompt_substitute REVIEWERS "$reviewers"
+  prompt_substitute AGENT "$agent"
+  prompt_substitute RALPH_DIR "$ralph_dir"
 
   if [[ "$prompt" == *'{{NATIVE_DELEGATION_CONTRACT}}'* ]]; then
     if ! native_delegation_contract="$(prompt_native_delegation_contract "$template_file" "$agent" "$step_json")"; then
       return 1
     fi
-    prompt="${prompt//\{\{NATIVE_DELEGATION_CONTRACT\}\}/$native_delegation_contract}"
+    prompt_substitute NATIVE_DELEGATION_CONTRACT "$native_delegation_contract"
   fi
 
   printf '%s\n' "$prompt"

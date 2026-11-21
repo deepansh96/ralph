@@ -22,7 +22,7 @@ Before any operation that can hard stop, make older initialized workspaces safe.
 Source the state manager:
 
 ```bash
-source {{RALPH_DIR}}/scripts/state.sh
+source "{{RALPH_DIR}}/scripts/state.sh"
 ```
 
 If `state.json` has no step with id `cleanup-local-resources`, add this one
@@ -76,9 +76,9 @@ On any hard stop failure, set this step's status to `failed` in `{{WORKSPACE}}/s
    delegated post-implementation steps. From the project root, run:
 
    ```bash
-   source {{RALPH_DIR}}/scripts/config.sh
+   source "{{RALPH_DIR}}/scripts/config.sh"
    ralph_config_delegated_step_defaults \
-     {{RALPH_DIR}}/ralph.config.json \
+     "{{RALPH_DIR}}/ralph.config.json" \
      codex
    ```
 
@@ -205,14 +205,14 @@ After appending any missing dynamic steps, snapshot the effective parent and
 worker settings onto both delegated steps. Source the state manager and run:
 
 ```bash
-source {{RALPH_DIR}}/scripts/state.sh
+source "{{RALPH_DIR}}/scripts/state.sh"
 state_snapshot_delegated_step_defaults \
   "{{WORKSPACE}}/state.json" \
-  {{RALPH_DIR}}/ralph.config.json \
+  "{{RALPH_DIR}}/ralph.config.json" \
   runthrough-qa-checklist
 state_snapshot_delegated_step_defaults \
   "{{WORKSPACE}}/state.json" \
-  {{RALPH_DIR}}/ralph.config.json \
+  "{{RALPH_DIR}}/ralph.config.json" \
   multi-axis-pr-review
 ```
 
@@ -238,7 +238,7 @@ the exact metadata shown in their shapes above:
 After the model/effort snapshot, fill missing metadata on every preflight run:
 
 ```bash
-source {{RALPH_DIR}}/scripts/state.sh
+source "{{RALPH_DIR}}/scripts/state.sh"
 state_backfill_delegation_metadata \
   "{{WORKSPACE}}/state.json" \
   runthrough-qa-checklist \
@@ -278,7 +278,7 @@ older initialized workspace.
 After updating state, run:
 
 ```bash
-{{RALPH_DIR}}/ralph.sh status --issue {{ISSUE}}
+"{{RALPH_DIR}}/ralph.sh" status --issue {{ISSUE}}
 ```
 
 Confirm the status output shows the fixed pipeline plus all dynamic steps:

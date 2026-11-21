@@ -6,7 +6,8 @@ Initialize a Ralph workspace for GitHub issue `{{ISSUE}}` in repo `{{REPO}}`.
 
 - Issue: `{{ISSUE}}`
 - Repo: `{{REPO}}`
-- Workspace: `ralph/workspaces/{{ISSUE}}` (`workspaces/{{ISSUE}}` relative to `ralph/`)
+- Ralph directory (`<ralph-dir>`): the folder that contains this `prompts/init.md`, relative to the project root. It is usually `ralph/`, but use the real folder name if Ralph was cloned under another name; every path below that starts with `<ralph-dir>/` means that folder.
+- Workspace: `<ralph-dir>/workspaces/{{ISSUE}}` (`workspaces/{{ISSUE}}` relative to `<ralph-dir>/`)
 
 ## Review-Decisions Rounds
 
@@ -31,19 +32,19 @@ If the user does not mention review-decisions rounds, use the default of 0. Incl
   - If those changes are speculative or feature-specific, commit and push them on a `grill/*` planning branch; when ready to build, set `.baseBranch` to that `grill/*` branch.
   - If those changes are already accepted for the mainline, commit and push or merge them into the intended base branch; then set `.baseBranch` to that updated branch.
   - Do not stash grilling docs unless the user explicitly wants `init` and downstream agents to ignore them.
-- Create `ralph/workspaces/{{ISSUE}}/`.
-- Write exactly one state file at `ralph/workspaces/{{ISSUE}}/state.json`.
-- Initialize `ralph/workspaces/{{ISSUE}}/local-resources.json` with
+- Create `<ralph-dir>/workspaces/{{ISSUE}}/`.
+- Write exactly one state file at `<ralph-dir>/workspaces/{{ISSUE}}/state.json`.
+- Initialize `<ralph-dir>/workspaces/{{ISSUE}}/local-resources.json` with
   `{"processes":[],"containers":[],"tempPaths":[],"sessions":[]}`.
-- Running init on an already-initialized workspace must not overwrite existing state. If `ralph/workspaces/{{ISSUE}}/state.json` already exists, stop with a clear warning or error.
+- Running init on an already-initialized workspace must not overwrite existing state. If `<ralph-dir>/workspaces/{{ISSUE}}/state.json` already exists, stop with a clear warning or error.
 - Set both `"baseBranch": null` and `"branch": null`. Do not infer defaults.
-- Capture `"projectRoot"` by running `git rev-parse --show-toplevel` from the project root (not from inside `ralph/`). Store the absolute path.
+- Capture `"projectRoot"` by running `git rev-parse --show-toplevel` from the project root (not from inside `<ralph-dir>/`). Store the absolute path.
 - Hardcode the agent defaults shown below. Do not use runtime agent detection.
-- After writing state, verify it with `jq` and confirm that `./ralph/ralph.sh status --issue {{ISSUE}}` shows all steps with pending status.
+- After writing state, verify it with `jq` and confirm that `./<ralph-dir>/ralph.sh status --issue {{ISSUE}}` shows all steps with pending status.
 
 ## State Schema
 
-Write `ralph/workspaces/{{ISSUE}}/state.json` with this shape:
+Write `<ralph-dir>/workspaces/{{ISSUE}}/state.json` with this shape:
 
 ```json
 {
@@ -161,11 +162,11 @@ The actual `state.json` output must be valid JSON (no comments). The comments ab
 1. Run `command -v gh`. If it fails, stop and report that the GitHub CLI is required.
 2. Run `gh issue view {{ISSUE}} --repo {{REPO}}`. If it fails, stop and report the issue lookup failure.
 3. Run `git status --porcelain`. If the output is not empty, stop and report that the working tree must be clean before initializing. Include this guidance: commit grilling docs to a pushed `grill/*` planning branch and use that branch as `.baseBranch`, or merge the docs into the intended base branch and use that branch as `.baseBranch`.
-4. If `ralph/workspaces/{{ISSUE}}/state.json` exists, stop. Do not silently overwrite it.
-5. Create `ralph/workspaces/{{ISSUE}}/`.
+4. If `<ralph-dir>/workspaces/{{ISSUE}}/state.json` exists, stop. Do not silently overwrite it.
+5. Create `<ralph-dir>/workspaces/{{ISSUE}}/`.
 6. Write `state.json` using the schema above. Use a current UTC ISO-8601 timestamp for `createdAt`.
 7. Write `local-resources.json` using the empty ledger above.
 8. Validate both JSON files with `jq`.
-9. Run `./ralph/ralph.sh status --issue {{ISSUE}}` and confirm all steps show `pending` status.
+9. Run `./<ralph-dir>/ralph.sh status --issue {{ISSUE}}` and confirm all steps show `pending` status.
 
 Do not run any pipeline step. This prompt only initializes the workspace state.

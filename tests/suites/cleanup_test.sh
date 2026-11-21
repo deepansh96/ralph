@@ -3,6 +3,15 @@ set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/test_helpers.sh"
 
+# Default-path tests must not follow a workspaces override from the caller's
+# shell, or they could archive (and teardown delete) a real workspace.
+unset RALPH_WORKSPACES_DIR RALPH_V2_WORKSPACES_DIR
+
+# Override-path fixtures live under one temp root outside the checkout, removed
+# on exit even when an assertion fails; the helpers' own cleanup still runs.
+FIXTURE_ROOT="$(mktemp -d)"
+trap 'rm -rf "$FIXTURE_ROOT"; cleanup' EXIT
+
 test_cleanup_archives_workspace_by_issue_number() {
   local issue date destination output
 
@@ -84,7 +93,7 @@ test_cleanup_removes_empty_workspaces_directory() {
   issue="9024"
   date="$(date +%Y-%m-%d)"
   destination="$ARCHIVE_DIR/$date-$issue"
-  test_workspaces="$(mktemp -d "${WORKSPACES_DIR}.isolated.XXXXXX")"
+  test_workspaces="$(mktemp -d "$FIXTURE_ROOT/isolated.XXXXXX")"
   rm -rf "$destination"
   mkdir -p "$test_workspaces/$issue"
   printf "state\n" > "$test_workspaces/$issue/state.json"
@@ -103,15 +112,12 @@ test_cleanup_falls_back_to_legacy_workspaces_dir_env_var() {
   issue="9085"
   date="$(date +%Y-%m-%d)"
   destination="$ARCHIVE_DIR/$date-$issue"
-  legacy_workspaces="$(mktemp -d "${WORKSPACES_DIR}.legacy.XXXXXX")"
+  legacy_workspaces="$(mktemp -d "$FIXTURE_ROOT/legacy.XXXXXX")"
   rm -rf "$destination"
   mkdir -p "$legacy_workspaces/$issue"
   printf "legacy-state\n" > "$legacy_workspaces/$issue/state.json"
 
-  output="$(
-    unset RALPH_WORKSPACES_DIR
-    RALPH_V2_WORKSPACES_DIR="$legacy_workspaces" "$CLEANUP_SCRIPT" "$issue"
-  )"
+  output="$(RALPH_V2_WORKSPACES_DIR="$legacy_workspaces" "$CLEANUP_SCRIPT" "$issue")"
 
   [[ -d "$destination" ]] || fail "expected archived workspace from RALPH_V2_WORKSPACES_DIR"
   [[ "$(<"$destination/state.json")" == "legacy-state" ]] || fail "expected legacy workspace state.json to be archived"
@@ -126,8 +132,8 @@ test_cleanup_prefers_ralph_workspaces_dir_over_legacy_env_var() {
   issue="9086"
   date="$(date +%Y-%m-%d)"
   destination="$ARCHIVE_DIR/$date-$issue"
-  new_workspaces="$(mktemp -d "${WORKSPACES_DIR}.new.XXXXXX")"
-  legacy_workspaces="$(mktemp -d "${WORKSPACES_DIR}.legacy.XXXXXX")"
+  new_workspaces="$(mktemp -d "$FIXTURE_ROOT/new.XXXXXX")"
+  legacy_workspaces="$(mktemp -d "$FIXTURE_ROOT/legacy.XXXXXX")"
   rm -rf "$destination"
   mkdir -p "$new_workspaces/$issue" "$legacy_workspaces/$issue"
   printf "new-state\n" > "$new_workspaces/$issue/state.json"
@@ -145,7 +151,6 @@ test_cleanup_prefers_ralph_workspaces_dir_over_legacy_env_var() {
   [[ -f "$legacy_workspaces/$issue/state.json" ]] || fail "expected legacy workspace to remain untouched"
   assert_contains "$output" "$new_workspaces/$issue"
   assert_contains "$output" "$destination"
-  rm -rf "$legacy_workspaces"
 }
 
 run_test test_cleanup_archives_workspace_by_issue_number

@@ -18,6 +18,10 @@ Mode: AFK, no HITL
 
 If any operation fails irrecoverably (checkout, tests, quality checks), set this step's status to `failed` in `{{WORKSPACE}}/state.json` with a note explaining the failure, then stop.
 
+## Long-Running Commands
+
+This step runs as a single non-interactive session: ending your turn ends the step, and Ralph treats that as done. Never end your turn while a command, test run, or background task is still running, and never end it with a "waiting for…" message. Run every command in the foreground and wait for its result. If a test run could exceed the shell tool's timeout, split it into smaller foreground runs (for example by test file or pattern) instead of backgrounding it. Only end your turn once the slice is committed, pushed, and closed, or after recording a failure per the Failure Protocol.
+
 ## Goal
 
 Read the project context, parent issue, and assigned sub-issue; implement only the assigned sub-issue via TDD on the feature branch; run project quality checks; commit, push, and close the sub-issue after the implementation is verified.

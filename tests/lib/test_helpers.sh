@@ -18,15 +18,9 @@ if [[ -f "$CONTEXT_FILE" ]]; then
   INITIAL_CONTEXT_PRESENT="true"
 fi
 
-cleanup() {
+# Removes what a suite leaves in the Ralph directory. Safe to run at load.
+cleanup_workspaces() {
   local issue
-
-  if [[ "$INITIAL_CONTEXT_PRESENT" == "true" ]]; then
-    cp "$INITIAL_CONTEXT_BACKUP" "$CONTEXT_FILE"
-  else
-    rm -f "$CONTEXT_FILE"
-  fi
-  rm -f "$INITIAL_CONTEXT_BACKUP"
 
   for issue in "${TEST_ISSUES[@]}"; do
     rm -rf "${WORKSPACES_DIR:?}/$issue"
@@ -36,8 +30,21 @@ cleanup() {
   rmdir "$ARCHIVE_DIR" 2>/dev/null || true
 }
 
+# Exit cleanup: also puts back the project's own CONTEXT.md. It consumes the
+# backup, so it must not run at load.
+cleanup() {
+  if [[ "$INITIAL_CONTEXT_PRESENT" == "true" ]]; then
+    [[ ! -f "$INITIAL_CONTEXT_BACKUP" ]] || cp "$INITIAL_CONTEXT_BACKUP" "$CONTEXT_FILE"
+  else
+    rm -f "$CONTEXT_FILE"
+  fi
+  rm -f "$INITIAL_CONTEXT_BACKUP"
+
+  cleanup_workspaces
+}
+
 trap cleanup EXIT
-cleanup
+cleanup_workspaces
 
 fail() {
   echo "FAIL: $*" >&2

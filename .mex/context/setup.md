@@ -17,7 +17,7 @@ edges:
     condition: when starting or observing a real Ralph run
   - target: patterns/recover-failed-or-stale-step.md
     condition: when status, logs, or stale PID checks fail
-last_updated: 2026-11-21
+last_updated: 2026-11-24
 ---
 
 # Setup
@@ -30,6 +30,7 @@ last_updated: 2026-11-21
 - `claude` CLI for Claude-owned steps.
 - `codex` CLI for default generated steps. The context check uses whichever CLI owns the first runnable step.
 - Pi CLI 0.70.1+ and DeepSeek credentials in Pi's auth store or `DEEPSEEK_API_KEY` for DeepSeek-owned steps.
+- Google Antigravity CLI (`agy`) on PATH and signed in for Gemini-owned steps.
 - `council` CLI for council review steps.
 - Node.js 20+ for the isolated Codex review and mex.
 - `cloudflared` or `ngrok` only when a quiz-grilling session needs a temporary public link.

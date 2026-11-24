@@ -19,7 +19,7 @@ Run one or more suites by name:
 - `cli_test.sh`: CLI argument validation, status output, logs, and activity snippets.
 - `cleanup_test.sh`: workspace archival and cleanup error handling.
 - `context_test.sh`: `CONTEXT.md` gate behavior before pipeline execution.
-- `agent_test.sh`: Claude, Codex, and DeepSeek/Pi dispatch, retries, metrics, logs, and working directory handling.
+- `agent_test.sh`: Claude, Codex, DeepSeek/Pi, and Gemini/agy dispatch, retries, metrics, logs, and working directory handling.
 - `state_test.sh`: state transitions, dynamic step appends, metrics fields, and stale PID recovery.
 - `delegation_test.sh`: shared delegation schemas, safe artifact writes, and fresh invocation preparation.
 - `claude_delegation_test.sh`: opt-in Claude hook sanitization, lifecycle correlation, and the fake foreground Agent CLI seam.

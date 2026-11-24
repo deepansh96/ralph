@@ -377,6 +377,174 @@ test_deepseek_step_retries_terminal_pi_error_event() {
   rm -f "$log_file" "$log_file".attempt-* "$metrics_file" "$count_file"
 }
 
+test_gemini_step_runs_via_agy_with_model_effort_and_metrics() {
+  local log_file metrics_file args_file cwd_file
+
+  log_file="$(mktemp)"
+  metrics_file="$(mktemp)"
+  args_file="$(mktemp)"
+  cwd_file="$(mktemp)"
+
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+    SCRIPT_DIR="$ROOT_DIR"
+
+    agy() {
+      printf '%s\n' "$@" > "$args_file"
+      pwd > "$cwd_file"
+      printf '%s\n' '{"event":"init","conversation_id":"fake","init":{"model":"gemini-4-neon"}}'
+      printf '%s\n' '{"event":"step_update","step_update":{"step_index":1,"state":"DONE","step_type":"agent_response","text_delta":"done","usage":{"input_tokens":5,"output_tokens":1}}}'
+      printf '%s\n' '{"event":"result","result":{"conversation_id":"fake","status":"SUCCESS","response":"done","duration_seconds":2.5,"usage":{"input_tokens":34,"output_tokens":13}}}'
+    }
+
+    agent_run_step '{"agent":"gemini","model":"gemini-4-neon","reasoningEffort":"high"}' \
+      "gemini prompt" "$log_file" "$PROJECT_ROOT" > "$metrics_file"
+  )
+
+  grep -Fx -- "--print" "$args_file" >/dev/null || fail "expected agy print mode"
+  grep -Fx -- "gemini prompt" "$args_file" >/dev/null || fail "expected rendered prompt"
+  grep -Fx -- "stream-json" "$args_file" >/dev/null || fail "expected stream-json output"
+  grep -Fx -- "--dangerously-skip-permissions" "$args_file" >/dev/null || fail "expected unattended permissions"
+  grep -Fx -- "--model" "$args_file" >/dev/null || fail "expected --model flag"
+  grep -Fx -- "gemini-4-neon" "$args_file" >/dev/null || fail "expected step model"
+  grep -Fx -- "--effort" "$args_file" >/dev/null || fail "expected --effort flag"
+  grep -Fx -- "high" "$args_file" >/dev/null || fail "expected step reasoning effort"
+  grep -Fx -- "--add-dir" "$args_file" >/dev/null || fail "expected the Ralph directory to be added to agy's workspace"
+  grep -Fx -- "$ROOT_DIR" "$args_file" >/dev/null || fail "expected --add-dir to name the Ralph directory"
+  [[ "$(<"$cwd_file")" == "$PROJECT_ROOT" ]] || fail "expected agy to run in project root"
+  assert_contains "$(<"$metrics_file")" '"provider": "gemini"'
+  assert_contains "$(<"$metrics_file")" '"duration_ms": 2500'
+  assert_contains "$(<"$metrics_file")" '"input_tokens": 34'
+  assert_contains "$(<"$metrics_file")" '"output_tokens": 13'
+  assert_contains "$(<"$metrics_file")" '"cost_usd": null'
+
+  rm -f "$log_file" "$metrics_file" "$args_file" "$cwd_file"
+}
+
+test_gemini_step_omits_model_and_effort_flags_when_unset() {
+  local log_file args_file
+
+  log_file="$(mktemp)"
+  args_file="$(mktemp)"
+
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+
+    agy() {
+      printf '%s\n' "$@" > "$args_file"
+      printf '%s\n' '{"event":"result","result":{"status":"SUCCESS","response":"done","usage":{"input_tokens":1,"output_tokens":1}}}'
+    }
+
+    agent_run_step '{"agent":"gemini"}' "prompt" "$log_file" "$PROJECT_ROOT" >/dev/null
+  )
+
+  if grep -Fx -- "--model" "$args_file" >/dev/null; then fail "expected no --model flag when the step sets no model"; fi
+  if grep -Fx -- "--effort" "$args_file" >/dev/null; then fail "expected no --effort flag when the step sets no effort"; fi
+
+  rm -f "$log_file" "$args_file"
+}
+
+test_gemini_step_fails_when_agy_result_is_not_success() {
+  local log_file status
+
+  log_file="$(mktemp)"
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+
+    agy() {
+      printf '%s\n' '{"event":"result","result":{"status":"ERROR","error":"model not found","usage":{"input_tokens":0,"output_tokens":0}}}'
+    }
+
+    set +e
+    run_gemini "prompt" "$log_file" "$PROJECT_ROOT" >/dev/null
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || fail "expected an agy ERROR result to fail the step"
+  )
+
+  rm -f "$log_file"
+}
+
+test_gemini_step_fails_when_agy_stream_has_no_result() {
+  local log_file status
+
+  log_file="$(mktemp)"
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+
+    agy() {
+      printf '%s\n' '{"event":"init","conversation_id":"fake","init":{}}'
+    }
+
+    set +e
+    run_gemini "prompt" "$log_file" "$PROJECT_ROOT" >/dev/null
+    status=$?
+    set -e
+    [[ "$status" -ne 0 ]] || fail "expected a stream without a result event to fail the step"
+  )
+
+  rm -f "$log_file"
+}
+
+test_gemini_step_retries_transient_agy_error() {
+  local log_file metrics_file count_file
+
+  log_file="$(mktemp)"
+  metrics_file="$(mktemp)"
+  count_file="$(mktemp)"
+  printf '0\n' > "$count_file"
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+    export RALPH_RETRY_DELAYS="0 0"
+
+    agy() {
+      local count
+      count="$(( $(<"$count_file") + 1 ))"
+      printf '%s\n' "$count" > "$count_file"
+      if [[ "$count" -eq 1 ]]; then
+        printf '%s\n' '{"event":"result","result":{"status":"ERROR","error":"rate limit exceeded"}}'
+        return 1
+      fi
+      printf '%s\n' '{"event":"result","result":{"status":"SUCCESS","response":"done","usage":{"input_tokens":34,"output_tokens":13}}}'
+    }
+
+    run_gemini "prompt" "$log_file" "$PROJECT_ROOT" > "$metrics_file"
+  )
+
+  [[ "$(<"$count_file")" -eq 2 ]] || fail "expected Ralph to retry a transient agy error"
+  [[ -f "$log_file.attempt-1" ]] || fail "expected the failed agy attempt log to be preserved"
+  assert_contains "$(<"$metrics_file")" '"output_tokens": 13'
+  rm -f "$log_file" "$log_file".attempt-* "$metrics_file" "$count_file"
+}
+
+test_gemini_step_rejects_unsupported_reasoning_effort() {
+  local log_file output status
+
+  log_file="$(mktemp)"
+  rm -f "$log_file"
+
+  (
+    source "$ROOT_DIR/scripts/metrics.sh"
+    source "$ROOT_DIR/scripts/agent.sh"
+
+    set +e
+    output="$(agent_run_step '{"agent":"gemini","reasoningEffort":"minimal"}' \
+      "invalid effort" "$log_file" "$PROJECT_ROOT" 2>&1)"
+    status=$?
+    set -e
+
+    [[ "$status" -eq 1 ]] || fail "expected unsupported effort to fail"
+    assert_contains "$output" "unsupported reasoning effort 'minimal' for agent 'gemini'"
+  )
+
+  rm -f "$log_file"
+}
+
 test_agent_rejects_unsupported_reasoning_effort() {
   local log_file output status
 
@@ -674,7 +842,7 @@ test_unsupported_agent_marks_step_failed() {
         {
           id: "unsupported-step",
           type: "test-fixture",
-          agent: "gemini",
+          agent: "kimi",
           status: "pending",
           metrics: {},
           notes: ""
@@ -702,6 +870,12 @@ run_test test_deepseek_step_runs_via_pi_with_default_model_reasoning_and_metrics
 run_test test_deepseek_step_fails_on_pi_error_event
 run_test test_deepseek_step_accepts_pi_recovery_after_error_event
 run_test test_deepseek_step_retries_terminal_pi_error_event
+run_test test_gemini_step_runs_via_agy_with_model_effort_and_metrics
+run_test test_gemini_step_omits_model_and_effort_flags_when_unset
+run_test test_gemini_step_fails_when_agy_result_is_not_success
+run_test test_gemini_step_fails_when_agy_stream_has_no_result
+run_test test_gemini_step_retries_transient_agy_error
+run_test test_gemini_step_rejects_unsupported_reasoning_effort
 run_test test_agent_rejects_unsupported_reasoning_effort
 run_test test_run_claude_fails_clean_json_error_without_retrying
 run_test test_run_claude_retries_empty_crash_log

@@ -48,6 +48,12 @@ context_agent_output() {
         | last // empty
       ')"
       ;;
+    gemini)
+      output="$(context_log_events "$log_file" '
+        [.[] | select(.event == "result") | .result.response // empty]
+        | last // empty
+      ')"
+      ;;
     *)
       output=""
       ;;

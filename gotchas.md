@@ -23,7 +23,7 @@ without resetting the active step, that step stays in_progress forever.
 
 To stop cleanly:
   1. Kill ralph.sh
-  2. ps aux | grep -E 'claude -p|codex|(/|[[:space:]])pi[[:space:]].*--provider[[:space:]]+deepseek' | grep -v grep
+  2. ps aux | grep -E 'claude -p|codex|agy --print|(/|[[:space:]])pi[[:space:]].*--provider[[:space:]]+deepseek' | grep -v grep
   3. Kill the matching agent subprocess(es)
   4. Check state.json and reset any in_progress step to pending
 
@@ -101,7 +101,7 @@ c) Council review progress:
    ls .council/<dir>/    — check which agents have *_done.txt files
 
 d) Process check:
-   ps aux | grep -E 'claude -p|codex|council-review|(/|[[:space:]])pi[[:space:]].*--provider[[:space:]]+deepseek' | grep -v grep
+   ps aux | grep -E 'claude -p|codex|agy --print|council-review|(/|[[:space:]])pi[[:space:]].*--provider[[:space:]]+deepseek' | grep -v grep
 
 
 8. STEP TIMING EXPECTATIONS

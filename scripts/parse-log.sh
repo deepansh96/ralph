@@ -56,6 +56,26 @@ parse_log() {
         end
       '
       ;;
+    gemini)
+      jq_filter='
+        select(.event == "step_update")
+        | .step_update
+        | if .step_type == "tool" and .state == "ACTIVE" then
+            "[tool] " + (.tool_name // "tool") + ": " + (
+              (
+                (.tool_info.parameters // {})
+                | to_entries
+                | (map(select(.key == "CommandLine" or .key == "Path")) | first) // first
+                | (.key + "=" + (.value | tostring)[:80])
+              ) // ""
+            )
+          elif .step_type == "agent_response" and ((.text_delta // "") | test("\\S")) then
+            "[text] " + (.text_delta[:120] | gsub("\n"; " "))
+          else
+            empty
+          end
+      '
+      ;;
     *)
       printf 'Unknown agent: %s\n' "$agent"
       return

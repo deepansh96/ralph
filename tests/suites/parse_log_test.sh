@@ -71,6 +71,31 @@ JSONL
   [[ "$output" != *"agent_end"* ]] || fail "expected agent_end to be filtered out"
 }
 
+test_parse_log_gemini_extracts_agy_text_and_tools() {
+  local log_file output
+
+  log_file="$(mktemp)"
+  cat > "$log_file" <<'JSONL'
+{"event":"init","conversation_id":"c1","init":{"model":"gemini-4-neon","tools":["run_command"]}}
+{"event":"step_update","step_update":{"step_index":0,"state":"DONE","step_type":"user_input"}}
+{"event":"step_update","step_update":{"step_index":2,"state":"ACTIVE","step_type":"tool","tool_name":"run_command","tool_info":{"name":"run_command","parameters":{"Blocking":true,"CommandLine":"npm test"}}}}
+{"event":"step_update","step_update":{"step_index":2,"state":"DONE","step_type":"tool","tool_name":"run_command","tool_info":{"name":"run_command","parameters":{"CommandLine":"npm test"},"output":"tests passed"}}}
+{"event":"step_update","step_update":{"step_index":3,"state":"ACTIVE","step_type":"agent_response","text_delta":"All tests pass. Committing now."}}
+{"event":"step_update","step_update":{"step_index":3,"state":"DONE","step_type":"agent_response","text_delta":"\n"}}
+{"event":"result","result":{"status":"SUCCESS","response":"All tests pass. Committing now.\n"}}
+JSONL
+
+  source "$ROOT_DIR/scripts/parse-log.sh"
+  output="$(parse_log "$log_file" "gemini" 10)"
+  rm -f "$log_file"
+
+  assert_contains "$output" "[tool] run_command: CommandLine=npm test"
+  assert_contains "$output" "[text] All tests pass. Committing now."
+  [[ "$output" != *"tests passed"* ]] || fail "expected tool output to be filtered out"
+  [[ "$(grep -c '\[tool\]' <<<"$output")" -eq 1 ]] || fail "expected one line per tool call"
+  [[ "$(grep -c '\[text\]' <<<"$output")" -eq 1 ]] || fail "expected blank text deltas and the result event to be filtered out"
+}
+
 test_parse_log_empty_file_shows_starting() {
   local log_file output
 
@@ -107,6 +132,7 @@ JSONL
 run_test test_parse_log_claude_extracts_text_and_tool_use
 run_test test_parse_log_codex_extracts_messages_and_commands
 run_test test_parse_log_deepseek_extracts_pi_messages_and_tools
+run_test test_parse_log_gemini_extracts_agy_text_and_tools
 run_test test_parse_log_empty_file_shows_starting
 run_test test_parse_log_partial_write_skips_truncated_lines
 

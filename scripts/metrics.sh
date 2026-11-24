@@ -90,6 +90,34 @@ metrics_from_pi_log() {
   fi
 }
 
+# Reads the last result event of an agy stream-json log. agy reports token
+# usage but no cost, and a few non-JSON lines must not hide the result.
+metrics_from_gemini_log() {
+  local log_file="$1"
+  local fallback_duration_ms="$2"
+  local metrics
+
+  metrics="$(jq -Rn \
+    --arg provider "gemini" \
+    --argjson fallback_duration "$fallback_duration_ms" \
+    '[inputs | fromjson? | objects | select(.event == "result")]
+     | last
+     | select(. != null)
+     | {
+         provider: $provider,
+         duration_ms: (((.result.duration_seconds // null) | if . == null then $fallback_duration else (. * 1000 | floor) end)),
+         input_tokens: (.result.usage.input_tokens // 0),
+         output_tokens: (.result.usage.output_tokens // 0),
+         cost_usd: null
+       }' "$log_file" 2>/dev/null)" || metrics=""
+
+  if [[ -n "$metrics" ]]; then
+    printf '%s\n' "$metrics"
+  else
+    metrics_empty_json "gemini" "$fallback_duration_ms"
+  fi
+}
+
 metrics_print_summary() {
   local state_file="$1"
 

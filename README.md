@@ -216,11 +216,17 @@ steps may set `agent` to `deepseek` and edit their optional `model` and
 `reasoningEffort` fields. DeepSeek
 steps run through Pi and require Pi 0.70.1+ plus DeepSeek credentials in Pi's
 auth store or `DEEPSEEK_API_KEY`; their defaults are `deepseek-v4-flash` with
-`high` reasoning effort:
+`high` reasoning effort. The same steps may set `agent` to `gemini`, which runs
+them through the Google Antigravity CLI (`agy`) in print mode from the project
+root. `agy` must be on `PATH` and signed in; `model` takes an id from
+`agy models`, either a base id such as `gemini-4-neon` with a separate
+`reasoningEffort`, or an id that already carries its effort. The two
+native-delegation steps cannot use `deepseek` or `gemini`. Supported efforts:
 
 - Codex: `low`, `medium`, `high`, `xhigh`, `max`, or `ultra`
 - Claude: `low`, `medium`, `high`, `xhigh`, or `max`
 - DeepSeek via Pi: `off`, `minimal`, `low`, `medium`, `high`, or `xhigh`
+- Gemini via agy: `low`, `medium`, `high`, `xhigh`, or `max`
 
 Effort availability still depends on the selected model and account. Omit a
 field to use the CLI's configured default, except DeepSeek uses the defaults

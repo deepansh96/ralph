@@ -12,6 +12,8 @@ triggers:
   - "claude"
   - "pi"
   - "deepseek"
+  - "gemini"
+  - "agy"
   - "council"
 edges:
   - target: context/decisions.md
@@ -22,7 +24,7 @@ edges:
     condition: when installing or validating local command availability
   - target: patterns/change-pipeline-behavior.md
     condition: when a stack choice affects a new or changed pipeline step
-last_updated: 2026-11-21
+last_updated: 2026-11-24
 ---
 
 # Stack
@@ -42,10 +44,11 @@ last_updated: 2026-11-21
 - **`claude` CLI** - executes Claude-owned steps; per-step model and `reasoningEffort` map to `--model` and `--effort`. The context completeness check uses the CLI selected by the first runnable step rather than requiring Claude.
 - **`codex` CLI** - default step executor for generated state; run from project root in `scripts/agent.sh`, with per-step model and `reasoningEffort` mapped to `--model` and `model_reasoning_effort`.
 - **`pi` CLI** - executes `deepseek` steps from the project root with `--provider deepseek`; defaults are `deepseek-v4-flash` and `high` reasoning effort, and per-step model and `reasoningEffort` map to `--model` and `--thinking`.
+- **`agy` CLI** - executes `gemini` steps in print mode from the project root with `--mode accept-edits`, `--dangerously-skip-permissions`, and stream-json output; per-step model and `reasoningEffort` map to `--model` and `--effort`, and the Ralph directory is added with `--add-dir`. A step succeeds only when the stream's last result event reports `SUCCESS`.
 - **Node.js** - runs the bundled isolated Codex App Server reviewer, the read-only Codex delegation evidence client, the dependency-free temporary quiz-grilling server, and private atomic delegation artifact writes (fsync and secure attempt IDs).
 - **`cloudflared` or `ngrok`** - optional tunnel client for exposing a temporary quiz-grilling link; Cloudflare Quick Tunnels are preferred.
 - **`council` CLI** - fan-out review runner for decision, PRD, and slice-planning workflows.
-- **Shell test fakes** - tests fake `claude`, `codex`, `pi`, `gh`, and `council`; never make deterministic tests depend on real services.
+- **Shell test fakes** - tests fake `claude`, `codex`, `pi`, `agy`, `gh`, and `council`; never make deterministic tests depend on real services.
 
 ## What We Deliberately Do NOT Use
 
@@ -58,5 +61,5 @@ last_updated: 2026-11-21
 ## Version Constraints
 
 - `jq`, `git`, `gh`, and Node.js must be available on PATH for the full pipeline. Public quiz-grilling links additionally require `cloudflared` or `ngrok`.
-- `claude`, `codex`, `pi`, and `council` must be available only for steps or prompts that invoke them. DeepSeek steps require Pi 0.70.1+ and credentials in its auth store or `DEEPSEEK_API_KEY`.
+- `claude`, `codex`, `pi`, `agy`, and `council` must be available only for steps or prompts that invoke them. DeepSeek steps require Pi 0.70.1+ and credentials in its auth store or `DEEPSEEK_API_KEY`.
 - mex requires Node.js 20+ when using `npx mex-agent`.

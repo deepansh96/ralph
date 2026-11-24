@@ -387,6 +387,38 @@ test_context_check_fails_closed_on_deepseek_message_without_text() {
   assert_contains "$CONTEXT_OUTPUT" "did not return CONTEXT_CHECK"
 }
 
+gemini_result() {
+  jq -n -c --arg status "$1" --arg response "$2" '{event: "result", result: {status: $status, response: $response}}'
+}
+
+test_context_check_extracts_gemini_pass() {
+  local issue="9085"
+
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  write_single_step_state "$issue" "gemini-step" "pending" "gemini"
+
+  run_stubbed_context_check "$issue" "$(jq -n -c '{event: "step_update", step_update: {step_type: "agent_response", text_delta: "CONTEXT_CHECK: FAIL"}}')
+$(gemini_result SUCCESS 'CONTEXT_CHECK: PASS
+CONTEXT.md follows the required format.')"
+
+  [[ "$CONTEXT_STATUS" -eq 0 ]] || fail "expected Gemini CONTEXT_CHECK PASS to return 0; output: $CONTEXT_OUTPUT"
+}
+
+test_context_check_extracts_gemini_fail() {
+  local issue="9086"
+
+  write_valid_context
+  rm -rf "${WORKSPACES_DIR:?}/$issue"
+  write_single_step_state "$issue" "gemini-step" "pending" "gemini"
+
+  run_stubbed_context_check "$issue" "$(gemini_result SUCCESS 'CONTEXT_CHECK: FAIL
+Missing glossary.')"
+
+  [[ "$CONTEXT_STATUS" -eq 1 ]] || fail "expected Gemini FAIL to return 1; output: $CONTEXT_OUTPUT"
+  assert_contains "$CONTEXT_OUTPUT" "Missing glossary."
+}
+
 test_context_check_runs_in_state_project_root() {
   local issue="9083"
   local project_dir
@@ -412,7 +444,7 @@ test_run_stops_before_step_when_first_agent_is_unsupported() {
 
   write_valid_context
   rm -rf "${WORKSPACES_DIR:?}/$issue"
-  write_single_step_state "$issue" "unsupported-step" "pending" "gemini"
+  write_single_step_state "$issue" "unsupported-step" "pending" "kimi"
 
   set +e
   output="$("$RALPH" --issue "$issue" 2>&1)"
@@ -420,7 +452,7 @@ test_run_stops_before_step_when_first_agent_is_unsupported() {
   set -e
 
   [[ "$status" -ne 0 ]] || fail "expected an unsupported first agent to stop the run"
-  assert_contains "$output" "unsupported agent 'gemini'"
+  assert_contains "$output" "unsupported agent 'kimi'"
   status_value="$(jq -r '.steps[0].status' "$WORKSPACES_DIR/$issue/state.json")"
   [[ "$status_value" == "pending" ]] || fail "expected the step to stay pending, got $status_value"
 }
@@ -439,6 +471,8 @@ run_test test_context_check_fails_without_runnable_step
 run_test test_context_check_uses_last_codex_message_for_fail
 run_test test_context_check_extracts_deepseek_fail
 run_test test_context_check_fails_closed_on_deepseek_message_without_text
+run_test test_context_check_extracts_gemini_pass
+run_test test_context_check_extracts_gemini_fail
 run_test test_context_check_runs_in_state_project_root
 run_test test_run_stops_before_step_when_first_agent_is_unsupported
 
